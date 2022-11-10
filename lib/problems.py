@@ -7,37 +7,6 @@ import scipy.linalg as sla
 import numpy.matlib as mt
 
 
-def generate_sym(size):
-    # create a row vector of given size
-    A = mt.rand(1, size)
-
-    # create a symmetric matrix size * size
-    symmA = A.T * A
-    return symmA
-
-
-def gen_cond(n, cond):
-    """
-    Parameters
-    ----------
-    n : Matrix size
-    cond : Condition number
-    Returns
-    -------
-    P : Return a n by n SPD matrix given a condition number
-    """
-    cond_P = cond     # Condition number
-    log_cond_P = np.log(cond_P)
-    exp_vec = np.arange(-log_cond_P/4., log_cond_P * (n)/(4 * (n - 1)), log_cond_P/(2.*(n-1)))
-    s = np.exp(exp_vec)
-    S = np.diag(s)
-    U, _ = LA.qr((np.random.rand(n, n) - 5.) * 200)
-    V, _ = LA.qr((np.random.rand(n, n) - 5.) * 200)
-    P = U.dot(S).dot(V.T)
-    P = P.dot(P.T)
-    return P
-
-
 class BaseSaddle(object):
     def __init__(self, A:np.ndarray):
         self.xopt = None
@@ -92,10 +61,8 @@ class BaseSaddle(object):
 class GeneralSaddle(BaseSaddle):
     def __init__(self, n, cond = 10, spd=False, bc=False):
         if spd:
-            print('spd')
-            self.A = gen_cond(n, cond)
+            self.A = ut.gen_cond(n, cond)
         else:
-            print('random')
             self.A = np.random.randn(n,n)
         if bc:
             print('bc')
@@ -170,8 +137,8 @@ class func2(BaseSaddle):
         self.A = A
         spectrum = sla.svd(A.T.dot(A))[1]
         self.L_xy = spectrum.max()**.5
-        self.mu_yx = spectrum.min() 
-        self.mu_xy = sla.svd(A.dot(A.T))[1].min()
+        self.mu_yx = spectrum.min()**.5
+        self.mu_xy = sla.svd(A.dot(A.T))[1].min()**.5
         
         self.constraint = False   
         self.dfdx = grad(self.f)  

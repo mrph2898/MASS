@@ -5,19 +5,52 @@ import lib.optimisers as opt
 import matplotlib.pyplot as plt
 import os
 
+import scipy.linalg as sla
+from scipy.stats import ortho_group 
 
-def gen_matrices(n_one: int, d: int, mean: float, std: float, noise: float,
-                 num_summands: int, seed=0):
-    np.random.seed(seed)
-    A_one = mean + std * np.random.randn(n_one, d)
-    A = np.tile(A_one.T, num_summands).T
-    A[n_one:] += noise * np.random.randn(n_one * (num_summands - 1), d)
 
-    b_one = mean + std * np.random.randn(n_one)
-    b = np.tile(b_one, num_summands)
-    b[n_one:] += noise * np.random.randn(n_one * (num_summands - 1))
+def generate_sym(size):
+    # create a row vector of given size
+    A = mt.rand(1, size)
 
-    return A, A_one, b, b_one
+    # create a symmetric matrix size * size
+    symmA = A.T * A
+    return symmA
+
+
+def gen_cond(n, cond):
+    """
+    Parameters
+    ----------
+    n : Matrix size
+    cond : Condition number
+    Returns
+    -------
+    P : Return a n by n SPD matrix given a condition number
+    """
+    cond_P = cond     # Condition number
+    log_cond_P = np.log(cond_P)
+    exp_vec = np.arange(-log_cond_P/4., log_cond_P * (n)/(4 * (n - 1)), log_cond_P/(2.*(n-1)))
+    s = np.exp(exp_vec)
+    S = np.diag(s)
+    U, _ = LA.qr((np.random.rand(n, n) - 5.) * 200)
+    V, _ = LA.qr((np.random.rand(n, n) - 5.) * 200)
+    P = U.dot(S).dot(V.T)
+    P = P.dot(P.T)
+    return P
+
+
+def get_A_fixed(lambda_min, lambda_max, n):
+    eigenvals = np.zeros(n)
+    eigenvals[1:-1] = np.random.randint(low=lambda_min**2, 
+                                        high=lambda_max**2,
+                                        size=n - 2)
+    eigenvals[0] = lambda_min**2
+    eigenvals[-1] = lambda_max**2
+    S = np.diag(eigenvals)
+
+    Q = ortho_group.rvs(dim=n)
+    return sla.sqrtm(Q.T @ S @ Q)
 
 
 def plot(x, y, z, dz_dx, dz_dy, 
