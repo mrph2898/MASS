@@ -118,7 +118,7 @@ class GeneralSaddle(BaseSaddle):
     
     
     def loss(self, x, y):
-        return LA.norm(x-self.xopt)**2 + LA.norm(y-self.yopt)**2
+        return np.sqrt(LA.norm(x-self.xopt)**2 + LA.norm(y-self.yopt)**2)
 
     
     

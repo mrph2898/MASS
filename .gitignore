@@ -1,4 +1,5 @@
 data_sim_sp/
+tdlearn/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
