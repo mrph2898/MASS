@@ -7,6 +7,11 @@ import os
 
 import scipy.linalg as sla
 from scipy.stats import ortho_group 
+from IPython.display import display, Latex
+
+from lib.problems import BaseSaddle
+import lib.optimisers as opt
+
 
 
 def generate_sym(size):
@@ -52,6 +57,40 @@ def get_A_fixed(lambda_min, lambda_max, n):
     Q = ortho_group.rvs(dim=n)
     return sla.sqrtm(Q.T @ S @ Q)
 
+
+def display_constants(problem: BaseSaddle):
+    display(Latex(r"$L_{xy}$ = " + f"{problem.L_xy:.5f}," +
+                  r"$\mu_{xy}$ = " + f"{problem.mu_xy:.5f}," +
+                  r"$\mu_{yx}$ = " + f"{problem.mu_yx:.5f}" 
+                 ))
+    display(Latex(r"$L_{x}$ = " + f"{problem.L_x:.5f}," +
+                  r"$\mu_{x}$ = " + f"{problem.mu_x:.5f}" 
+                 ))
+    display(Latex(r"$L_{y}$ = " + f"{problem.L_y:.5f}," +
+                  r"$\mu_{y}$ = " + f"{problem.mu_y:.5f}" 
+                 ))
+    display(Latex(r"$\sqrt{\frac{L_x}{\mu_{x}}}$ = " + f"{(problem.L_x / problem.mu_x)**.5:.5f}" + 
+                  r"$\sqrt{\frac{L_y}{\mu_{y}}}$ = " + f"{(problem.L_y / problem.mu_y)**.5:.5f}" +
+                  r"$\frac{L_{xy}}{\sqrt{\mu_{x} \mu_y}}$ = " + f"{problem.L_xy / (problem.mu_x*problem.mu_y)**.5:.5f}"))
+    display(Latex(r"$\frac{\sqrt{L_x L_y}}{\mu_{xy}}$ = " + f"{(problem.L_x * problem.L_y)**.5 / problem.mu_xy:.5f}" +
+                  r"$\frac{L_{xy}}{\mu_{xy}}\cdot\sqrt{\frac{L_x}{\mu_{x}}}$ = " + f"{(problem.L_xy / problem.mu_xy)*(problem.L_x / problem.mu_x)**.5:.5f}" + 
+                  r"$\frac{L_{xy}^2}{\mu_{xy}^2}$ = " + f"{(problem.L_xy**2 / problem.mu_xy**2):.5f}"))
+    display(Latex(r"$\frac{\sqrt{L_x L_y}}{\mu_{yx}}$ = " + f"{(problem.L_x * problem.L_y)**.5 / problem.mu_yx:.5f}" +
+                  r"$\frac{L_{xy}}{\mu_{yx}}\cdot\sqrt{\frac{L_y}{\mu_{y}}}$ = " + f"{(problem.L_xy / problem.mu_yx)*(problem.L_y / problem.mu_y)**.5:.5f}"  +
+                  r"$\frac{L_{xy}^2}{\mu_{yx}^2}$ = " + f"{(problem.L_xy**2 / problem.mu_yx**2):.5f}"
+                 ))
+    display(Latex(r"$\frac{\sqrt{L_x L_y} L_{xy}}{\mu_{xy}\mu_{yx}}$ = " + f"{(problem.L_x * problem.L_y)**.5 / problem.mu_xy:.5f}" +
+                  r"$\frac{L_{xy}^2}{\mu_{yx}^2}$ = " + f"{(problem.L_xy**2 / problem.mu_yx**2):.5f}" + 
+                  r"$\frac{L_{xy}^2}{\mu_{xy}^2}$ = " + f"{(problem.L_xy**2 / problem.mu_xy**2):.5f}"
+                 ))
+    params = opt._get_apdg_params(problem)
+    _pstr = ""
+    for name, val in params.items():
+        _pstr += f"$\\{name}$ = {val:.6f}\n"
+    display(Latex(_pstr))
+    
+    
+    
 
 def plot(x, y, z, dz_dx, dz_dy, 
          loss, xpath, ypath,
@@ -103,15 +142,19 @@ def plot(x, y, z, dz_dx, dz_dy,
         fig.savefig(figname, dpi=300, bbox_inches = 'tight', pad_inches = 0)
 
         
-def main(problem, iteration, x0, y0, params, k=5):
+def main(problem, iteration, 
+         x0, y0,
+         params, one_dim=False, k=5
+        ):
     allloss = [[] for _ in  range(8)]
     allxpath = [[] for _ in  range(8)]
     allypath = [[] for _ in  range(8)]
-    allloss[0], allxpath[0], allypath[0] = opt.APDG(problem=problem, x0=x0, y0=y0, iter_num=iteration, params=params['apdg'])
-    allloss[1], allxpath[1], allypath[1] = opt.altgd(problem, x0, y0, iteration, lr=params['altgd'])
+    allloss[0], allxpath[0], allypath[0] = opt.APDG(problem=problem, x0=x0.copy(), y0=y0.copy(), iter_num=iteration, params=params['apdg'])
+    allloss[1], allxpath[1], allypath[1] = opt.altgd(problem, x0.copy(), y0.copy(), iteration, lr=params['altgd'])
     # allloss[2], allxpath[2], allypath[2] = eg(problem, x0, y0, iteration, lr=lrset['eg'])
     # allloss[3], allxpath[3], allypath[3] = omd(problem, x0, y0, iteration, lr=lrset['omd'])
     # allloss[4], allxpath[4], allypath[4]= simGDAAM(problem, x0, y0, iteration, lr=lrset['AA'], k=k)   
-    allloss[5], allxpath[5], allypath[5]= opt.altGDAAM(problem, x0, y0, iteration, lr=params['AA'] ,k=k)   
+    if one_dim:
+        allloss[5], allxpath[5], allypath[5]= opt.altGDAAM(problem, x0.copy(), y0.copy(), iteration, lr=params['AA'] ,k=k)   
     # allloss[6], allxpath[6], allypath[6]= simgd(problem, x0, y0, iteration, lr=lrset['simgd'])   
     return allloss, allxpath, allypath

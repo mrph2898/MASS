@@ -120,30 +120,30 @@ def _get_apdg_params(problem: BaseSaddle):
         delta = (mu_y / mu_x)**.5
         sigma_x = (mu_x / (2 * L_x))**.5
         sigma_y = (mu_y / (2 * L_y))**.5
-        rho_a = 4 + 4 * max((L_x / mu_x)**.5,
+        rho_a = (4 + 4 * max((L_x / mu_x)**.5,
                         (L_y / mu_y)**.5,
-                        L_xy / (mu_x * mu_y)**.5)
+                        L_xy / (mu_x * mu_y)**.5)) ** (-1)
     elif (mu_x > 0) and (mu_y == 0):
         delta = (mu_xy**2 / (2*mu_x*L_x))**.5
         sigma_x = (mu_x / (2 * L_x))**.5
         sigma_y = min(1, (mu_xy**2 / (4*L_x*L_y))**.5)
-        rho_b = 4 + 8 * max((L_x * L_y)**.5 / mu_xy,
+        rho_b = (4 + 8 * max((L_x * L_y)**.5 / mu_xy,
                         L_xy / mu_xy * (L_x / mu_x)**.5,
-                        L_xy**2 / mu_xy**2)
+                        L_xy**2 / mu_xy**2)) ** (-1)
     elif (mu_x == 0) and (mu_y > 0):
         delta = (2*mu_y**2 * L_y / mu_yx**2)**.5
         sigma_x = min(1, (mu_yx**2 / (4*L_x*L_y))**.5)
         sigma_y = (mu_y / (2 * L_y))**.5
-        rho_c = 4 + 8 * max((L_x * L_y)**.5 / mu_yx,
-                            L_xy / mu_yx *(L_y / mu_y)**.5,
-                            L_xy**2 / mu_xy**2)
+        rho_c = (4 + 8 * max((L_x * L_y)**.5 / mu_yx,
+                             L_xy / mu_yx *(L_y / mu_y)**.5,
+                             L_xy**2 / mu_xy**2)) ** (-1)
     elif (mu_x == 0) and (mu_y == 0):
         delta = (mu_xy / mu_yx)*(L_y / L_x)**.5
         sigma_x = min(1, (mu_yx**2 / (4*L_x*L_y))**.5)
         sigma_y = min(1, (mu_yx**2 / (4*L_x*L_y))**.5)
-        rho_d = 2 + 8 * max((L_x * L_y)**.5 * L_xy / (mu_xy * mu_yx),
+        rho_d = (2 + 8 * max((L_x * L_y)**.5 * L_xy / (mu_xy * mu_yx),
                         L_xy**2 / mu_yx**2,
-                        L_xy**2 / mu_xy**2)
+                        L_xy**2 / mu_xy**2)) ** (-1)
 
     theta = 1 - max(rho_a, rho_b, rho_c, rho_d)
     eta_x = min(1 / (4 * (mu_x + L_x * sigma_x)), delta/(4*L_xy))
