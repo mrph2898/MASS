@@ -4,6 +4,7 @@ import numpy.linalg as npla
 import lib.optimisers as opt
 import matplotlib.pyplot as plt
 import os
+import lib.lpd as lpd
 
 from scipy.stats import ortho_group 
 from IPython.display import display, Latex
@@ -37,8 +38,8 @@ def gen_cond(n, cond):
     exp_vec = np.arange(-log_cond_P/4., log_cond_P * (n)/(4 * (n - 1)), log_cond_P/(2.*(n-1)))
     s = np.exp(exp_vec)
     S = np.diag(s)
-    U, _ = LA.qr((np.random.rand(n, n) - 5.) * 200)
-    V, _ = LA.qr((np.random.rand(n, n) - 5.) * 200)
+    U, _ = sla.qr((np.random.rand(n, n) - 5.) * 200)
+    V, _ = sla.qr((np.random.rand(n, n) - 5.) * 200)
     P = U.dot(S).dot(V.T)
     P = P.dot(P.T)
     return P
@@ -108,7 +109,7 @@ def plot(x, y, z, dz_dx, dz_dy,
     ax2 = axlist[1]    
     ax1.contourf(x, y, z, 5, cmap=plt.cm.gray)
     ax1.quiver(x, y, x - dz_dx, y - dz_dy, alpha=.5)
-    ax1.plot(xpath7, ypath7,  'm-', linewidth=2, label='SimGDA',markevery=markevery)
+    ax1.plot(xpath8, ypath8,  'm-', linewidth=2, label='LPD',markevery=markevery)
     ax1.plot(xpath1, ypath1, 'g--', linewidth=2, label='APDG',markevery=markevery)
     ax1.plot(xpath2, ypath2, '--',linewidth=2, label='AltGD',markevery=markevery)
     ax1.plot(xpath3, ypath3, 'k-^', linewidth=2, label='EG',markevery=markevery)
@@ -124,7 +125,7 @@ def plot(x, y, z, dz_dx, dz_dy,
     ax1.set_ylim([ymin,ymax])
     
     plot_interval =1
-    # ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss7[::plot_interval], 'm-', markevery=markevery, label='SimGDA')
+    ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss8[::plot_interval], 'm-', markevery=markevery, label='LPD')
     ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss1[::plot_interval], 'g--', markevery=markevery, label='APDG')
     ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss2[::plot_interval], '--', markevery=markevery, label='AltGD')
     # ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss3[::plot_interval], 'k-^', markevery=markevery, label='EG')
@@ -155,5 +156,7 @@ def main(problem, iteration,
     # allloss[4], allxpath[4], allypath[4]= simGDAAM(problem, x0, y0, iteration, lr=lrset['AA'], k=k)   
     if one_dim:
         allloss[5], allxpath[5], allypath[5]= opt.altGDAAM(problem, x0.copy(), y0.copy(), iteration, lr=params['AA'] ,k=k)   
-    # allloss[6], allxpath[6], allypath[6]= simgd(problem, x0, y0, iteration, lr=lrset['simgd'])   
+    # allloss[6], allxpath[6], allypath[6]= simgd(problem, x0, y0, iteration, lr=lrset['simgd']
+    allloss[7], allxpath[7], allypath[7] = lpd.LiftedPrimalDual(problem, x0, y0, iteration + 1)
+    print(len(allxpath[7]), len(allypath[7]))
     return allloss, allxpath, allypath
