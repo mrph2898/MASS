@@ -7,6 +7,7 @@ from IPython.display import display, Latex
 
 from lib.problems import BaseSaddle
 import lib.optimisers as opt
+import lib.lpd as lpd
 
 
 def display_constants(problem: BaseSaddle):
@@ -65,6 +66,7 @@ def plot(x, y, z, dz_dx, dz_dy,
     ax1.plot(xpath4, ypath4, 'c-*', linewidth=2, label='OMD',markevery=markevery)
     ax1.plot(xpath6, ypath6, 'b->', linewidth=2, label='SimGDA-RAM', markevery=markevery)
     ax1.plot(xpath5, ypath5, 'r-d', linewidth=2, label='AltGDA-RAM', markevery=markevery)
+    ax1.plot(xpath8, ypath8, 'r-d', linewidth=2, label='LPD', markevery=markevery)
     x_init = ax1.scatter(x0, y0, marker='s', s=250, c='g',alpha=1,zorder=3, label='Start')
     x_sol = ax1.scatter(xsol, ysol, s=250, marker='*', color='violet', zorder=3, label='Optima')
     ax1.legend([x_init, x_sol],['Start','Optima'], markerscale=1, loc=4, fancybox=True, framealpha=1., fontsize=20)
@@ -81,6 +83,7 @@ def plot(x, y, z, dz_dx, dz_dy,
     # ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss4[::plot_interval],'c-*', markevery=markevery, label='OMD')
     # ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss5[::plot_interval], 'r-d', markevery=markevery, label='SimGDA-RAM')
     ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss6[::plot_interval], 'b->', markevery=markevery, label='AltGDA-RAM')
+    ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss8[::plot_interval], 'r-d', markevery=markevery, label='LPD')
     ax2.set_xlabel('Iteration')
     ax2.set_ylim([1e-25,1e4])
     ax2.set_ylabel('Distance to optimal')
@@ -106,4 +109,5 @@ def main(problem, iteration,
     if one_dim:
         allloss[5], allxpath[5], allypath[5]= opt.altGDAAM(problem, x0.copy(), y0.copy(), iteration, lr=params['AA'] ,k=k)   
     # allloss[6], allxpath[6], allypath[6]= simgd(problem, x0, y0, iteration, lr=lrset['simgd'])   
+    allloss[7], allxpath[7], allypath[7]= lpd.LiftedPrimalDual(problem, x0, y0, iteration + 1)
     return allloss, allxpath, allypath

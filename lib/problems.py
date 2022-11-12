@@ -6,6 +6,7 @@ from scipy.linalg import pinv
 import scipy.linalg as sla
 import numpy.matlib as mt
 from scipy.stats import ortho_group
+import scipy
 
 
 def generate_sym(size):
@@ -70,33 +71,18 @@ class BaseSaddle(object):
         self.mu_xy = None
         self.mu_yx = None
         self.L_xy = None
-        self.F = lambda x, y: self.f(x, y) + y.T @ self.A @ x - self.g(x, y)
-        self.dfdx = grad(self.f)
-        self.dfdy = 0
-        
-        self.dgdx = 0
-        self.dgdy = grad(self.g, 1) 
+        self.F = lambda x, y: self.f(x) + y.T @ self.A @ x - self.g(y)
+        self.grad_f = grad(self.f)
+        self.grad_g = grad(self.g)
         self.dFdx = grad(self.F)
         self.dFdy = grad(self.F, 1)
-        # self.d2fdxdx = grad(self.dfdx)
-        # self.d2fdydy = 0
-        # self.d2fdxdy = grad(self.dfdx, 1)
-        # self.d2fdydx = grad(self.dfdy)
 
-    def fr(self, x, y):
-        "this is used for the baseline model(follow the ridge)"
-        yy = self.d2fdydy(x, y)
-        yx = self.d2fdydx(x, y)
-        if yy == 0:
-            return 0
-        return yx/yy
-    
     def grad(self, x, y):
         derivs = np.array([self.dFdx(x, y), self.dFdy(x, y)])
         return derivs[0], derivs[1]
     
     def fg_grads(self, x, y):
-        derivs = np.array([self.dfdx(x, y), self.dgdy(x, y)])
+        derivs = np.array([self.grad_f(x), self.grad_g(y)])
         return derivs[0], derivs[1]
     
     def loss(self, x, y):
@@ -127,38 +113,28 @@ class GeneralSaddle(BaseSaddle):
         self.mu_yx = spectrum.min() 
         self.mu_xy = sla.svd(self.A.dot(self.A.T))[1].min()
         
-        self.f = lambda x, y : x.transpose() @ x
+        self.f = lambda x: self.B.transpose() @ x + x.transpose() @ x
         self.mu_x = 2
         self.L_x = 2
-        self.g = lambda x, y: y.transpose() @ y
+        self.g = lambda y: self.C.transpose() @ y + y.transpose() @ y
         self.mu_y = 2
         self.L_y = 2
 
-        F =  lambda x,y:  self.f(x, y) - self.g(x, y) + y.transpose() @ self.A @ x + self.B.transpose() @ x + self.C.transpose() @ y 
+        F =  lambda x,y:  self.f(x) + y.transpose() @ self.A @ x - self.g(y)
         self.constraint = False   
-        self.dfdx = grad(self.f)
-        self.dfdy = 0
-        self.dgdx = 0
-        self.dgdy = grad(self.g, 1) 
+        self.grad_f = grad(self.f)
+        self.grad_g = grad(self.g)
         
         self.dFdx = grad(F)
         self.dFdy = grad(F, 1)   
-        self.d2Fdxdx = grad(self.dFdx)
-        self.d2Fdydy = grad(self.dFdy, 1)
-        self.d2Fdxdy = grad(self.dFdx, 1)
-        self.d2Fdydx = grad(self.dFdy)
     
-    
-    def fr(self, x, y):
-        yx = self.d2Fdydx(x, y)
-        return yx
     
     def grad(self, x, y):
         derivs = np.array([self.dFdx(x,y), self.dFdy(x,y)])
         return derivs[0], derivs[1]
     
     def fg_grads(self, x, y):
-        derivs = np.array([self.dfdx(x,y), self.dgdy(x,y)])
+        derivs = np.array([self.grad_f(x,y), self.grad_g(x,y)])
         return derivs[0], derivs[1]
     
     
@@ -173,10 +149,10 @@ class func2(BaseSaddle):
         self.xopt, self.yopt = 0., 0.   
         self.xrange = [-10, 10, .2]
         self.yrange = [-10, 10, .2]
-        self.f = lambda x, y : x**2
+        self.f = lambda x : x**2
         self.mu_x = 2
         self.L_x = 2
-        self.g = lambda x, y: y**2
+        self.g = lambda y: y**2
         self.mu_y = 2
         self.L_y = 2
         self.A = A
