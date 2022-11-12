@@ -4,10 +4,52 @@ import numpy as np
 from numpy import linalg as LA
 from scipy.linalg import pinv
 import scipy.linalg as sla
-from scipy.stats import ortho_group
-import scipy
 import numpy.matlib as mt
-import lib.utils as ut
+from scipy.stats import ortho_group
+
+
+def generate_sym(size):
+    # create a row vector of given size
+    A = mt.rand(1, size)
+
+    # create a symmetric matrix size * size
+    symmA = A.T * A
+    return symmA
+
+
+def gen_cond(n, cond):
+    """
+    Parameters
+    ----------
+    n : Matrix size
+    cond : Condition number
+    Returns
+    -------
+    P : Return a n by n SPD matrix given a condition number
+    """
+    cond_P = cond     # Condition number
+    log_cond_P = np.log(cond_P)
+    exp_vec = np.arange(-log_cond_P/4., log_cond_P * (n)/(4 * (n - 1)), log_cond_P/(2.*(n-1)))
+    s = np.exp(exp_vec)
+    S = np.diag(s)
+    U, _ = LA.qr((np.random.rand(n, n) - 5.) * 200)
+    V, _ = LA.qr((np.random.rand(n, n) - 5.) * 200)
+    P = U.dot(S).dot(V.T)
+    P = P.dot(P.T)
+    return P
+
+
+def get_A_fixed(lambda_min, lambda_max, n):
+    eigenvals = np.zeros(n)
+    eigenvals[1:-1] = np.random.randint(low=lambda_min**2, 
+                                        high=lambda_max**2,
+                                        size=n - 2)
+    eigenvals[0] = lambda_min**2
+    eigenvals[-1] = lambda_max**2
+    S = np.diag(eigenvals)
+
+    Q = ortho_group.rvs(dim=n)
+    return LA.sqrtm(Q.T @ S @ Q)
 
 
 class BaseSaddle(object):
@@ -28,10 +70,12 @@ class BaseSaddle(object):
         self.mu_xy = None
         self.mu_yx = None
         self.L_xy = None
-        self.F = lambda x, y: self.f(x) + y.T @ self.A @ x - self.g(y)
-        self.grad_f = grad(self.f)
-
-        self.grad_g = grad(self.g)
+        self.F = lambda x, y: self.f(x, y) + y.T @ self.A @ x - self.g(x, y)
+        self.dfdx = grad(self.f)
+        self.dfdy = 0
+        
+        self.dgdx = 0
+        self.dgdy = grad(self.g, 1) 
         self.dFdx = grad(self.F)
         self.dFdy = grad(self.F, 1)
         # self.d2fdxdx = grad(self.dfdx)
@@ -48,10 +92,12 @@ class BaseSaddle(object):
         return yx/yy
     
     def grad(self, x, y):
-        return self.dFdx(x, y), self.dFdy(x, y)
-
+        derivs = np.array([self.dFdx(x, y), self.dFdy(x, y)])
+        return derivs[0], derivs[1]
+    
     def fg_grads(self, x, y):
-        return self.grad_f(x), self.grad_g(y)
+        derivs = np.array([self.dfdx(x, y), self.dgdy(x, y)])
+        return derivs[0], derivs[1]
     
     def loss(self, x, y):
         return np.sqrt(LA.norm(x-self.xopt)**2 + LA.norm(y-self.yopt)**2)
@@ -60,7 +106,7 @@ class BaseSaddle(object):
 class GeneralSaddle(BaseSaddle):
     def __init__(self, n, cond = 10, spd=False, bc=False):
         if spd:
-            self.A = ut.gen_cond(n, cond)
+            self.A = gen_cond(n, cond)
         else:
             self.A = np.random.randn(n,n)
         if bc:
@@ -78,38 +124,44 @@ class GeneralSaddle(BaseSaddle):
             
         spectrum = sla.svd(self.A.T.dot(self.A))[1]
         self.L_xy = spectrum.max()**.5
-        self.mu_yx = spectrum.min()**.5
+        self.mu_yx = spectrum.min() 
         self.mu_xy = sla.svd(self.A.dot(self.A.T))[1].min()
-
-        self.f = lambda x: x.transpose() @ x + self.B.transpose() @ x
+        
+        self.f = lambda x, y : x.transpose() @ x
         self.mu_x = 2
         self.L_x = 2
-        self.g = lambda y: y.transpose() @ y + self.C.transpose() @ y
+        self.g = lambda x, y: y.transpose() @ y
         self.mu_y = 2
         self.L_y = 2
-        self.F = lambda x, y: self.f(x) + y.T @ self.A @ x - self.g(y)
 
-        self.constraint = False
-        self.grad_f = grad(self.f)
-        self.grad_g = grad(self.g)
-
-        self.dFdx = grad(self.F)
-        self.dFdy = grad(self.F, 1)
+        F =  lambda x,y:  self.f(x, y) - self.g(x, y) + y.transpose() @ self.A @ x + self.B.transpose() @ x + self.C.transpose() @ y 
+        self.constraint = False   
+        self.dfdx = grad(self.f)
+        self.dfdy = 0
+        self.dgdx = 0
+        self.dgdy = grad(self.g, 1) 
+        
+        self.dFdx = grad(F)
+        self.dFdy = grad(F, 1)   
+        self.d2Fdxdx = grad(self.dFdx)
+        self.d2Fdydy = grad(self.dFdy, 1)
+        self.d2Fdxdy = grad(self.dFdx, 1)
+        self.d2Fdydx = grad(self.dFdy)
     
     
     def fr(self, x, y):
         yx = self.d2Fdydx(x, y)
         return yx
-
+    
     def grad(self, x, y):
         derivs = np.array([self.dFdx(x,y), self.dFdy(x,y)])
         return derivs[0], derivs[1]
-
+    
     def fg_grads(self, x, y):
-        derivs = np.array([self.grad_f(x), self.grad_g(y)])
+        derivs = np.array([self.dfdx(x,y), self.dgdy(x,y)])
         return derivs[0], derivs[1]
-
-
+    
+    
     def loss(self, x, y):
         return np.sqrt(LA.norm(x-self.xopt)**2 + LA.norm(y-self.yopt)**2)
 
@@ -121,10 +173,10 @@ class func2(BaseSaddle):
         self.xopt, self.yopt = 0., 0.   
         self.xrange = [-10, 10, .2]
         self.yrange = [-10, 10, .2]
-        self.f = lambda x: x**2
+        self.f = lambda x, y : x**2
         self.mu_x = 2
         self.L_x = 2
-        self.g = lambda y: y**2
+        self.g = lambda x, y: y**2
         self.mu_y = 2
         self.L_y = 2
         self.A = A
@@ -406,4 +458,3 @@ class BilinearQuadraticSaddle:
       distance_squared = np.inf
 
     return distance_squared
-

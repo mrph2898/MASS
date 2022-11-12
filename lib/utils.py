@@ -1,61 +1,12 @@
 import numpy as np
 import scipy.linalg as LA
 import numpy.linalg as npla
-import lib.optimisers as opt
 import matplotlib.pyplot as plt
 import os
-import lib.lpd as lpd
-
-from scipy.stats import ortho_group 
 from IPython.display import display, Latex
 
 from lib.problems import BaseSaddle
 import lib.optimisers as opt
-
-
-
-def generate_sym(size):
-    # create a row vector of given size
-    A = mt.rand(1, size)
-
-    # create a symmetric matrix size * size
-    symmA = A.T * A
-    return symmA
-
-
-def gen_cond(n, cond):
-    """
-    Parameters
-    ----------
-    n : Matrix size
-    cond : Condition number
-    Returns
-    -------
-    P : Return a n by n SPD matrix given a condition number
-    """
-    cond_P = cond     # Condition number
-    log_cond_P = np.log(cond_P)
-    exp_vec = np.arange(-log_cond_P/4., log_cond_P * (n)/(4 * (n - 1)), log_cond_P/(2.*(n-1)))
-    s = np.exp(exp_vec)
-    S = np.diag(s)
-    U, _ = sla.qr((np.random.rand(n, n) - 5.) * 200)
-    V, _ = sla.qr((np.random.rand(n, n) - 5.) * 200)
-    P = U.dot(S).dot(V.T)
-    P = P.dot(P.T)
-    return P
-
-
-def get_A_fixed(lambda_min, lambda_max, n):
-    eigenvals = np.zeros(n)
-    eigenvals[1:-1] = np.random.randint(low=lambda_min**2, 
-                                        high=lambda_max**2,
-                                        size=n - 2)
-    eigenvals[0] = lambda_min**2
-    eigenvals[-1] = lambda_max**2
-    S = np.diag(eigenvals)
-
-    Q = ortho_group.rvs(dim=n)
-    return LA.sqrtm(Q.T @ S @ Q)
 
 
 def display_constants(problem: BaseSaddle):
@@ -89,8 +40,6 @@ def display_constants(problem: BaseSaddle):
         _pstr += f"$\\{name}$ = {val:.6f}\n"
     display(Latex(_pstr))
     
-    
-    
 
 def plot(x, y, z, dz_dx, dz_dy, 
          loss, xpath, ypath,
@@ -109,7 +58,7 @@ def plot(x, y, z, dz_dx, dz_dy,
     ax2 = axlist[1]    
     ax1.contourf(x, y, z, 5, cmap=plt.cm.gray)
     ax1.quiver(x, y, x - dz_dx, y - dz_dy, alpha=.5)
-    ax1.plot(xpath8, ypath8,  'm-', linewidth=2, label='LPD',markevery=markevery)
+    ax1.plot(xpath7, ypath7,  'm-', linewidth=2, label='SimGDA',markevery=markevery)
     ax1.plot(xpath1, ypath1, 'g--', linewidth=2, label='APDG',markevery=markevery)
     ax1.plot(xpath2, ypath2, '--',linewidth=2, label='AltGD',markevery=markevery)
     ax1.plot(xpath3, ypath3, 'k-^', linewidth=2, label='EG',markevery=markevery)
@@ -125,7 +74,7 @@ def plot(x, y, z, dz_dx, dz_dy,
     ax1.set_ylim([ymin,ymax])
     
     plot_interval =1
-    ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss8[::plot_interval], 'm-', markevery=markevery, label='LPD')
+    # ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss7[::plot_interval], 'm-', markevery=markevery, label='SimGDA')
     ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss1[::plot_interval], 'g--', markevery=markevery, label='APDG')
     ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss2[::plot_interval], '--', markevery=markevery, label='AltGD')
     # ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss3[::plot_interval], 'k-^', markevery=markevery, label='EG')
@@ -156,7 +105,5 @@ def main(problem, iteration,
     # allloss[4], allxpath[4], allypath[4]= simGDAAM(problem, x0, y0, iteration, lr=lrset['AA'], k=k)   
     if one_dim:
         allloss[5], allxpath[5], allypath[5]= opt.altGDAAM(problem, x0.copy(), y0.copy(), iteration, lr=params['AA'] ,k=k)   
-    # allloss[6], allxpath[6], allypath[6]= simgd(problem, x0, y0, iteration, lr=lrset['simgd']
-    allloss[7], allxpath[7], allypath[7] = lpd.LiftedPrimalDual(problem, x0, y0, iteration + 1)
-    print(len(allxpath[7]), len(allypath[7]))
+    # allloss[6], allxpath[6], allypath[6]= simgd(problem, x0, y0, iteration, lr=lrset['simgd'])   
     return allloss, allxpath, allypath
