@@ -5,6 +5,7 @@ from numpy import linalg as LA
 from scipy.linalg import pinv
 import scipy.linalg as sla
 import numpy.matlib as mt
+import lib.utils as ut
 
 
 class BaseSaddle(object):
@@ -25,7 +26,7 @@ class BaseSaddle(object):
         self.mu_xy = None
         self.mu_yx = None
         self.L_xy = None
-        self.F = lambda x, y: self.f(x, y) + x.T @ self.A @ y - self.g(x, y)
+        self.F = lambda x, y: self.f(x, y) + y.T @ self.A @ x - self.g(x, y)
         self.dfdx = grad(self.f)
         self.dfdy = 0
         
@@ -68,14 +69,14 @@ class GeneralSaddle(BaseSaddle):
             print('bc')
             self.B = np.random.randn(n,1)
             self.C = np.random.randn(n,1)
-            self.xopt = LA.solve(self.A.transpose(), -self.C)
-            self.yopt = LA.solve(self.A, -self.B)    
+            self.xopt = LA.solve(self.A, -self.C)
+            self.yopt = LA.solve(self.A.transpose(), -self.B)    
         else:
             print('bc zeros')
             self.B = np.zeros((n,1))
             self.C = np.zeros((n,1))
-            self.xopt = LA.solve(self.A.transpose(), -self.C)
-            self.yopt = LA.solve(self.A, -self.B) 
+            self.xopt = LA.solve(self.A, -self.C)
+            self.yopt = LA.solve(self.A.transpose(), -self.B) 
             
         spectrum = sla.svd(self.A.T.dot(self.A))[1]
         self.L_xy = spectrum.max()**.5
@@ -89,7 +90,7 @@ class GeneralSaddle(BaseSaddle):
         self.mu_y = 2
         self.L_y = 2
 
-        F =  lambda x,y:  self.f(x, y) - self.g(x, y) + x.transpose() @ self.A @ y + self.B.transpose() @ x + self.C.transpose() @ y 
+        F =  lambda x,y:  self.f(x, y) - self.g(x, y) + y.transpose() @ self.A @ x + self.B.transpose() @ x + self.C.transpose() @ y 
         self.constraint = False   
         self.dfdx = grad(self.f)
         self.dfdy = 0

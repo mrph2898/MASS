@@ -23,14 +23,10 @@ def altgd(problem: BaseSaddle,
          ):
     x, y = x0.copy(), y0.copy()
     
-    xopt, yopt = problem.xopt, problem.yopt
     _x_hist, _y_hist = [], []
     _x_hist.append(x)
     _y_hist.append(y)
-    loss = []
-    if problem.xopt is not None:
-        xopt, yopt = problem.xopt, problem.yopt
-        loss.append(np.sqrt(LA.norm(x-xopt)**2 + LA.norm(y-yopt)**2))
+    loss = [problem.loss(x, y)]
         
     for i in range(iteration):
         g_x, _ = problem.grad(x,y)
@@ -52,13 +48,10 @@ def avg(problem: BaseSaddle,
           k: int=0
        ):
     x, y = x0.copy(), y0.copy()
-    xopt, yopt = problem.xopt, problem.yopt
-    loss = []
-    if problem.xopt is not None:
-        xopt, yopt = problem.xopt, problem.yopt
-        loss.append(np.sqrt(LA.norm(x-xopt)**2 + LA.norm(y-yopt)**2))
+    loss = [problem.loss(x, y)]
     xavg, yavg = x, y
     x_hist, y_hist = [xavg], [yavg]
+    
     for i in range(iteration):
         x = x - lr/np.sqrt(i+1)*(y)
         y = y + lr/np.sqrt(i+1)*(x)        
@@ -84,19 +77,16 @@ def altGDAAM(problem: BaseSaddle,
     Proposed Methods: alternating GDA with Anderson Acceleration with numpy
     '''
     x, y = x0, y0
-    xopt, yopt = problem.xopt, problem.yopt
     x_hist, y_hist = [x], [y]
-    loss = []
-    if problem.xopt is not None:
-        xopt, yopt = problem.xopt, problem.yopt
-        loss.append(np.sqrt(LA.norm(x-xopt)**2 + LA.norm(y-yopt)**2))
+    loss = [problem.loss(x, y)]
+        
     fp = np.vstack((x, y))
     aa = AA.numpyAA(2, k, type2=type2, reg=reg)
     for i in range(iteration):
         fpprev = np.copy(fp)
-        g_x, _ = problem.grad(x,y)
-        x_ = (1-gamma) * x - lr * g_x
-        _, g_y = problem.grad(x_,y)
+        g_x, _ = problem.grad(x, y)
+        x_ = (1 - gamma) * x - lr * g_x
+        _, g_y = problem.grad(x_, y)
         y_ = y + lr * g_y
         fp = np.vstack((x_, y_))
         fp = aa.apply(fpprev, fp)
@@ -191,10 +181,7 @@ def APDG(problem,
     if params is None:
         params = _get_apdg_params(problem)
     
-    loss = []
-    if problem.xopt is not None:
-        xopt, yopt = problem.xopt, problem.yopt
-        loss.append(np.sqrt(LA.norm(x-xopt)**2 + LA.norm(y-yopt)**2))
+    loss = [problem.loss(x, y)]
     x_hist, y_hist = [x], [y]
     
     for i in tqdm(range(iter_num)):

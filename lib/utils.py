@@ -1,11 +1,10 @@
 import numpy as np
-import scipy.linalg as sla
+import scipy.linalg as LA
 import numpy.linalg as npla
 import lib.optimisers as opt
 import matplotlib.pyplot as plt
 import os
 
-import scipy.linalg as sla
 from scipy.stats import ortho_group 
 from IPython.display import display, Latex
 
@@ -55,7 +54,7 @@ def get_A_fixed(lambda_min, lambda_max, n):
     S = np.diag(eigenvals)
 
     Q = ortho_group.rvs(dim=n)
-    return sla.sqrtm(Q.T @ S @ Q)
+    return LA.sqrtm(Q.T @ S @ Q)
 
 
 def display_constants(problem: BaseSaddle):
