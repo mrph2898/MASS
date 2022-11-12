@@ -76,13 +76,13 @@ def plot(x, y, z, dz_dx, dz_dy,
     ax1.set_ylim([ymin,ymax])
     
     plot_interval =1
-    # ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss7[::plot_interval], 'm-', markevery=markevery, label='SimGDA')
     ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss1[::plot_interval], 'g--', markevery=markevery, label='APDG')
     ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss2[::plot_interval], '--', markevery=markevery, label='AltGD')
-    # ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss3[::plot_interval], 'k-^', markevery=markevery, label='EG')
-    # ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss4[::plot_interval],'c-*', markevery=markevery, label='OMD')
+    ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss3[::plot_interval], 'k-^', markevery=markevery, label='EG')
+    ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss4[::plot_interval],'c-*', markevery=markevery, label='OMD')
     # ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss5[::plot_interval], 'r-d', markevery=markevery, label='SimGDA-RAM')
     ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss6[::plot_interval], 'b->', markevery=markevery, label='AltGDA-RAM')
+    ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss7[::plot_interval], 'm-', markevery=markevery, label='SimGDA')
     ax2.semilogy(np.arange(0, iteration+plot_interval, plot_interval), loss8[::plot_interval], 'r-d', markevery=markevery, label='LPD')
     ax2.set_xlabel('Iteration')
     ax2.set_ylim([1e-25,1e4])
@@ -101,13 +101,12 @@ def main(problem, iteration,
     allloss = [[] for _ in  range(8)]
     allxpath = [[] for _ in  range(8)]
     allypath = [[] for _ in  range(8)]
-    allloss[0], allxpath[0], allypath[0] = opt.APDG(problem=problem, x0=x0.copy(), y0=y0.copy(), iter_num=iteration, params=params['apdg'])
-    allloss[1], allxpath[1], allypath[1] = opt.altgd(problem, x0.copy(), y0.copy(), iteration, lr=params['altgd'])
-    # allloss[2], allxpath[2], allypath[2] = eg(problem, x0, y0, iteration, lr=lrset['eg'])
-    # allloss[3], allxpath[3], allypath[3] = omd(problem, x0, y0, iteration, lr=lrset['omd'])
+    allloss[0], allxpath[0], allypath[0] = opt.APDG(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, params=params['apdg'])
+    allloss[1], allxpath[1], allypath[1] = opt.altgd(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, lr=params['altgd'])
+    allloss[2], allxpath[2], allypath[2] = opt.eg(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, lr=params['eg'])
+    allloss[3], allxpath[3], allypath[3] = opt.omd(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, lr=params['omd'])
     # allloss[4], allxpath[4], allypath[4]= simGDAAM(problem, x0, y0, iteration, lr=lrset['AA'], k=k)   
-    if one_dim:
-        allloss[5], allxpath[5], allypath[5]= opt.altGDAAM(problem, x0.copy(), y0.copy(), iteration, lr=params['AA'] ,k=k)   
-    # allloss[6], allxpath[6], allypath[6]= simgd(problem, x0, y0, iteration, lr=lrset['simgd'])   
+    allloss[5], allxpath[5], allypath[5]= opt.altGDAAM(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, lr=params['AA'], k=k)   
+    allloss[6], allxpath[6], allypath[6]= opt.simgd(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, lr=params['simgd'])   
     allloss[7], allxpath[7], allypath[7]= lpd.LiftedPrimalDual(problem, x0, y0, iteration + 1)
     return allloss, allxpath, allypath

@@ -14,36 +14,56 @@ import lib.anderson_acceleration as AA
 from lib.problems import BaseSaddle
 
 
+def simgd(problem: BaseSaddle,
+          x0: np.ndarray, 
+          y0: np.ndarray,
+          max_iter: int,
+          lr: float,
+          k: int=0
+         ):
+    x, y = x0.copy(), y0.copy()
+    loss = [problem.loss(x, y)]
+    x_hist, y_hist = [x], [y]
+    
+    for i in tqdm(range(max_iter), desc="SimGD"):
+        gx, gy = problem.grad(x, y)
+        x = x - lr * gx
+        y = y + lr * gy
+        lo = problem.loss(x, y)
+        loss.append(lo)  
+        x_hist.append(x)
+        y_hist.append(y)
+    return loss, x_hist, y_hist
+
+
 def altgd(problem: BaseSaddle,
           x0: np.ndarray, 
           y0: np.ndarray,
-          iteration: int,
+          max_iter: int,
           lr: float,
           k: int=0
          ):
     x, y = x0.copy(), y0.copy()
     
-    _x_hist, _y_hist = [], []
-    _x_hist.append(x)
-    _y_hist.append(y)
+    x_hist, y_hist = [x], [y]
     loss = [problem.loss(x, y)]
         
-    for i in range(iteration):
+    for i in tqdm(range(max_iter), desc="AltGD"):
         g_x, _ = problem.grad(x,y)
         x = x - lr * g_x
         _, g_y = problem.grad(x,y)
         y = y + lr * g_y
-        _x_hist.append(x)
-        _y_hist.append(y)
+        x_hist.append(x)
+        y_hist.append(y)
         loss.append(problem.loss(x, y))
     
-    return loss, _x_hist, _y_hist
+    return loss, x_hist, y_hist
 
 
 def avg(problem: BaseSaddle,
           x0: np.ndarray, 
           y0: np.ndarray,
-          iteration: int,
+          max_iter: int,
           lr: float,
           k: int=0
        ):
@@ -52,7 +72,7 @@ def avg(problem: BaseSaddle,
     xavg, yavg = x, y
     x_hist, y_hist = [xavg], [yavg]
     
-    for i in range(iteration):
+    for i in tqdm(range(max_iter), desc="AVG"):
         x = x - lr/np.sqrt(i+1)*(y)
         y = y + lr/np.sqrt(i+1)*(x)        
         xavg = xavg*(i+1)/(i+2) + x/(i+2)
@@ -63,11 +83,59 @@ def avg(problem: BaseSaddle,
     return loss, x_hist, y_hist
 
 
+def eg(problem: BaseSaddle,
+       x0: np.ndarray, 
+       y0: np.ndarray,
+       max_iter: int,
+       lr: float,
+       k: int=0):
+    x, y = x0.copy(), y0.copy()
+    loss = [problem.loss(x, y)]
+    x_hist, y_hist = [x], [y]
+    
+    for i in tqdm(range(max_iter), desc="EG"):
+        gx, gy = problem.grad(x, y)
+        x_ = x - lr * gx
+        y_ = y + lr * gy
+        gx, gy = problem.grad(x_, y_)
+        x = x - lr * gx
+        y = y + lr * gy
+        lo = problem.loss(x, y)
+        loss.append(lo)  
+        x_hist.append(x)
+        y_hist.append(y)
+    return loss, x_hist, y_hist
+
+
+def omd(problem: BaseSaddle,
+        x0: np.ndarray, 
+        y0: np.ndarray,
+        max_iter: int,
+        lr: float,
+        k: int=0):
+    x, y = x0.copy(), y0.copy()
+    loss = [problem.loss(x, y)]
+    x_hist, y_hist = [x], [y]
+    
+    x_l, y_l = 0.5*x0, 0.5*y0
+    g_xl, g_yl = problem.grad(x_l,y_l)
+    for i in tqdm(range(max_iter), desc="OMD"):
+        g_x, g_y = problem.grad(x,y)
+        x = x - 2 * lr * g_x + lr * g_xl
+        y = y + 2 * lr * g_y - lr * g_yl
+        g_xl, g_yl =  g_x, g_y
+        lo = problem.loss(x, y)
+        loss.append(lo)   
+        x_hist.append(x)
+        y_hist.append(y)
+    return loss, x_hist, y_hist
+
+
 gamma = 1e-26 # For 1d problems, you can also set gamma=0.
 def altGDAAM(problem: BaseSaddle,
              x0: np.ndarray, 
              y0: np.ndarray,
-             iteration: int,
+             max_iter: int,
              lr: float,
              k: int=0,
              type2: bool=True,
@@ -82,7 +150,7 @@ def altGDAAM(problem: BaseSaddle,
         
     fp = np.vstack((x, y))
     aa = AA.numpyAA(2, k, type2=type2, reg=reg)
-    for i in range(iteration):
+    for i in tqdm(range(max_iter), desc="AltGDA-AM"):
         fpprev = np.copy(fp)
         g_x, _ = problem.grad(x, y)
         x_ = (1 - gamma) * x - lr * g_x
@@ -96,6 +164,8 @@ def altGDAAM(problem: BaseSaddle,
         x_hist.append(x)
         y_hist.append(y)
     return loss, x_hist, y_hist
+
+
 
 
 def _get_apdg_params(problem: BaseSaddle):
@@ -162,7 +232,7 @@ def _get_apdg_params(problem: BaseSaddle):
 def APDG(problem,
          x0: np.ndarray,
          y0: np.ndarray,
-         iter_num: int,
+         max_iter: int,
          params: dict=None
         ):
     """
@@ -184,7 +254,7 @@ def APDG(problem,
     loss = [problem.loss(x, y)]
     x_hist, y_hist = [x], [y]
     
-    for i in tqdm(range(iter_num)):
+    for i in tqdm(range(max_iter), desc="APDG"):
         y_m = y + params['theta'] * (y - y_prev)
         x_g = params['tau_x'] * x + (1 - params['tau_x']) * x_f
         y_g = params['tau_y'] * y + (1 - params['tau_y']) * y_f
