@@ -170,7 +170,7 @@ class BilinearQuadraticSaddle:
       c: None or np.array([dy])
     """
     self.A = np.array(A)
-    self.dx, self.dy = self.A.shape
+    self.dy, self.dx = self.A.shape
     print(self.dx, self.dy)
 
     if B is not None:
@@ -208,12 +208,10 @@ class BilinearQuadraticSaddle:
     self.L_x, self.mu_x = eigvalsx[-1], eigvalsx[0]
 
     eigvalsxy = LA.eigvalsh(self.A @ self.A.T)
-    print(eigvalsxy[-1], eigvalsxy[0])
-    self.L_xy, self.mu_xy = eigvalsxy[-1], eigvalsxy[0]
+    self.L_xy, self.mu_xy = np.sqrt(eigvalsxy[-1]), np.sqrt(eigvalsxy[0])
 
     eigvalsyx = LA.eigvalsh(self.A.T @ self.A)
-    self.L_yx, self.mu_yx = eigvalsyx[-1], eigvalsyx[0]
-    print('L_xy = {}, L_yx = {}', L_xy, L_yx)
+    self.L_yx, self.mu_yx = np.sqrt(eigvalsyx[-1]), np.sqrt(eigvalsyx[0])
 
     eigvalsy = LA.eigvalsh(self.C)
     self.L_y, self.mu_y = eigvalsy[-1], eigvalsy[0]
@@ -231,7 +229,6 @@ class BilinearQuadraticSaddle:
     nA = min(nx, ny)
     eigvals_A = np.linspace(mu_xy, L_xy, nA)
     if nx < ny:
-        mA = np.stack((np.diag(eigvals_A), np.zeros([ny - nA, nx])))
         print(np.diag(eigvals_A).shape)
         print(np.zeros([ny, nx - nA]).shape)
         mA = np.concatenate((np.diag(eigvals_A), np.zeros([nx, ny - nA])), axis=1)
@@ -241,7 +238,7 @@ class BilinearQuadraticSaddle:
         print(np.zeros([ny, nx - nA]).shape)
         mA = np.concatenate((np.diag(eigvals_A), np.zeros([nx - nA, ny])), axis=0)
         print(mA.shape)
-    A = rvsx().dot(mA).dot(rvsy())
+    A = rvsx().dot(mA).dot(rvsy()).T
 
     eigvals_B = np.linspace(mu_x**0.5, L_x**0.5, nx)
     B = rvsx().dot(np.diag(eigvals_B).dot(rvsx()))
@@ -251,7 +248,7 @@ class BilinearQuadraticSaddle:
     C = rvsy().dot(np.diag(eigvals_C).dot(rvsy()))
     C = C.T.dot(C)
 
-    return QuadraticSeparableMinimaxProb(A=A, B=B, C=C)
+    return cls(A=A, B=B, C=C)
 
 
   def f(self, x):
