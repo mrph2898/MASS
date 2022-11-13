@@ -95,54 +95,70 @@ def plot(x, y, z, dz_dx, dz_dy,
         
 def main(problem, iteration, 
          x0, y0,
-         params, one_dim=False, k=5
+         params, one_dim=False, k=5,
+         verbose=1
         ):
     all_methods = {}
     
     if 'apdg' in params:
-        loss, x, y = opt.APDG(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, params=params['apdg'])
+        loss, x, y = opt.APDG(problem=problem, x0=x0.copy(), y0=y0.copy(), 
+                              max_iter=iteration, params=params['apdg'], verbose=verbose)
         all_methods["APDG"] = {"marker": 'g--',
                                "loss_hist": loss,
                                "x_hist": x,
                                "y_hist": y
                               }
     if 'altgd' in params:
-        loss, x, y = opt.altgd(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, lr=params['altgd'])
+        loss, x, y = opt.altgd(problem=problem, x0=x0.copy(), y0=y0.copy(), 
+                               max_iter=iteration, lr=params['altgd'], verbose=verbose)
         all_methods["AltGD"] = {"marker": '--',
                                "loss_hist": loss,
                                "x_hist": x,
                                "y_hist": y
                               }
     if 'eg' in params:
-        loss, x, y = opt.eg(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, lr=params['eg'])
+        loss, x, y = opt.eg(problem=problem, x0=x0.copy(), y0=y0.copy(), 
+                            max_iter=iteration, lr=params['eg'], verbose=verbose)
         all_methods["EG"] = {"marker": 'k-^',
                                "loss_hist": loss,
                                "x_hist": x,
                                "y_hist": y
                               }
     if "omd" in params:
-        loss, x, y = opt.omd(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, lr=params['omd'])
+        loss, x, y = opt.omd(problem=problem, x0=x0.copy(), y0=y0.copy(), 
+                             max_iter=iteration, lr=params['omd'], verbose=verbose)
         all_methods["OMD"] = {"marker": 'c-*',
                                "loss_hist": loss,
                                "x_hist": x,
                                "y_hist": y
                               }
     if 'AA' in params:
-        loss, x, y = opt.altGDAAM(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, lr=params['AA'], k=k)
-        all_methods["AltGDA-RAM"] = {"marker": 'b->',
+        try:
+            loss, x, y = opt.altGDAAM(problem=problem, x0=x0.copy(), y0=y0.copy(),
+                                      max_iter=iteration, lr=params['AA'], k=k, verbose=verbose)
+            all_methods["AltGDA-AM"] = {"marker": 'b->',
                                      "loss_hist": loss,
                                      "x_hist": x,
                                      "y_hist": y
                                     }
+        except ValueError:
+            all_methods["AltGDA-AM"] = {"marker": 'b->',
+                                     "loss_hist": [np.nan],
+                                     "x_hist": [np.nan],
+                                     "y_hist": [np.nan]
+                                    }
+            
+        
     if 'sigmd' in params:
-        loss, x, y = opt.simgd(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, lr=params['simgd'])  
+        loss, x, y = opt.simgd(problem=problem, x0=x0.copy(), y0=y0.copy(),
+                               max_iter=iteration, lr=params['simgd'], verbose=verbose)  
         all_methods["SimGD"] = {"marker": 'm-',
                                 "loss_hist": loss,
                                 "x_hist": x,
                                 "y_hist": y
                               }
         
-    loss, x, y = lpd.LiftedPrimalDual(problem, x0, y0, iteration + 1)
+    loss, x, y = lpd.LiftedPrimalDual(problem, x0, y0, iteration + 1, verbose=verbose)
     all_methods["LPD"] = {"marker": 'r-d',
                           "loss_hist": loss,
                           "x_hist": x,

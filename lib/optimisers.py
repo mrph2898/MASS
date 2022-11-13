@@ -19,13 +19,18 @@ def simgd(problem: BaseSaddle,
           y0: np.ndarray,
           max_iter: int,
           lr: float,
-          k: int=0
+          k: int=0,
+          verbose=1
          ):
     x, y = x0.copy(), y0.copy()
     loss = [problem.loss(x, y)]
     x_hist, y_hist = [x], [y]
     
-    for i in tqdm(range(max_iter), desc="SimGD"):
+    bar = range(max_iter)
+    if verbose > 0:
+        bar = tqdm(bar, desc="SimGD")
+    
+    for i in bar:
         gx, gy = problem.grad(x, y)
         x = x - lr * gx
         y = y + lr * gy
@@ -41,14 +46,19 @@ def altgd(problem: BaseSaddle,
           y0: np.ndarray,
           max_iter: int,
           lr: float,
-          k: int=0
+          k: int=0,
+          verbose=1
          ):
     x, y = x0.copy(), y0.copy()
     
     x_hist, y_hist = [x], [y]
     loss = [problem.loss(x, y)]
         
-    for i in tqdm(range(max_iter), desc="AltGD"):
+    bar = range(max_iter)
+    if verbose > 0:
+        bar = tqdm(bar, desc="AltGD")
+    
+    for i in bar:
         g_x, _ = problem.grad(x,y)
         x = x - lr * g_x
         _, g_y = problem.grad(x,y)
@@ -65,14 +75,19 @@ def avg(problem: BaseSaddle,
           y0: np.ndarray,
           max_iter: int,
           lr: float,
-          k: int=0
+          k: int=0,
+          verbose=1
        ):
     x, y = x0.copy(), y0.copy()
     loss = [problem.loss(x, y)]
     xavg, yavg = x, y
     x_hist, y_hist = [xavg], [yavg]
     
-    for i in tqdm(range(max_iter), desc="AVG"):
+    bar = range(max_iter)
+    if verbose > 0:
+        bar = tqdm(bar, desc="Avg")
+    
+    for i in bar:
         x = x - lr/np.sqrt(i+1)*(y)
         y = y + lr/np.sqrt(i+1)*(x)        
         xavg = xavg*(i+1)/(i+2) + x/(i+2)
@@ -88,12 +103,17 @@ def eg(problem: BaseSaddle,
        y0: np.ndarray,
        max_iter: int,
        lr: float,
-       k: int=0):
+       k: int=0,
+       verbose=1):
     x, y = x0.copy(), y0.copy()
     loss = [problem.loss(x, y)]
     x_hist, y_hist = [x], [y]
     
-    for i in tqdm(range(max_iter), desc="EG"):
+    bar = range(max_iter)
+    if verbose > 0:
+        bar = tqdm(bar, desc="EG")
+    
+    for i in bar:
         gx, gy = problem.grad(x, y)
         x_ = x - lr * gx
         y_ = y + lr * gy
@@ -112,14 +132,19 @@ def omd(problem: BaseSaddle,
         y0: np.ndarray,
         max_iter: int,
         lr: float,
-        k: int=0):
+        k: int=0,
+        verbose=1):
     x, y = x0.copy(), y0.copy()
     loss = [problem.loss(x, y)]
     x_hist, y_hist = [x], [y]
     
     x_l, y_l = 0.5*x0, 0.5*y0
     g_xl, g_yl = problem.grad(x_l,y_l)
-    for i in tqdm(range(max_iter), desc="OMD"):
+    bar = range(max_iter)
+    if verbose > 0:
+        bar = tqdm(bar, desc="OMD")
+    
+    for i in bar:
         g_x, g_y = problem.grad(x,y)
         x = x - 2 * lr * g_x + lr * g_xl
         y = y + 2 * lr * g_y - lr * g_yl
@@ -139,7 +164,8 @@ def altGDAAM(problem: BaseSaddle,
              lr: float,
              k: int=0,
              type2: bool=True,
-             reg: float=1e-10
+             reg: float=1e-10,
+             verbose=1
             ):
     '''
     Proposed Methods: alternating GDA with Anderson Acceleration with numpy
@@ -150,7 +176,11 @@ def altGDAAM(problem: BaseSaddle,
         
     fp = np.vstack((x, y))
     aa = AA.numpyAA(2, k, type2=type2, reg=reg)
-    for i in tqdm(range(max_iter), desc="AltGDA-AM"):
+    bar = range(max_iter)
+    if verbose > 0:
+        bar = tqdm(bar, desc="AltGDA-AM")
+    
+    for i in bar:
         fpprev = np.copy(fp)
         g_x, _ = problem.grad(x, y)
         x_ = (1 - gamma) * x - lr * g_x
@@ -233,7 +263,8 @@ def APDG(problem,
          x0: np.ndarray,
          y0: np.ndarray,
          max_iter: int,
-         params: dict=None
+         params: dict=None,
+         verbose=1
         ):
     """
     params: dict with
@@ -254,7 +285,11 @@ def APDG(problem,
     loss = [problem.loss(x, y)]
     x_hist, y_hist = [x], [y]
     
-    for i in tqdm(range(max_iter), desc="APDG"):
+    bar = range(max_iter)
+    if verbose > 0:
+        bar = tqdm(bar, desc="APDG")
+    
+    for i in bar:
         y_m = y + params['theta'] * (y - y_prev)
         x_g = params['tau_x'] * x + (1 - params['tau_x']) * x_f
         y_g = params['tau_y'] * y + (1 - params['tau_y']) * y_f

@@ -198,7 +198,7 @@ class BilinearQuadraticSaddle:
     """
     self.A = np.array(A)
     self.dy, self.dx = self.A.shape
-    print(self.dx, self.dy)
+    # print(self.dx, self.dy)
 
     if B is not None:
       self.B = np.array(B)
@@ -256,15 +256,15 @@ class BilinearQuadraticSaddle:
     nA = min(nx, ny)
     eigvals_A = np.linspace(mu_xy, L_xy, nA)
     if nx < ny:
-        print(np.diag(eigvals_A).shape)
-        print(np.zeros([ny, nx - nA]).shape)
+        # print(np.diag(eigvals_A).shape)
+        # print(np.zeros([ny, nx - nA]).shape)
         mA = np.concatenate((np.diag(eigvals_A), np.zeros([nx, ny - nA])), axis=1)
-        print(mA.shape)
+        # print(mA.shape)
     else:
-        print(np.diag(eigvals_A).shape)
-        print(np.zeros([ny, nx - nA]).shape)
+        # print(np.diag(eigvals_A).shape)
+        # print(np.zeros([ny, nx - nA]).shape)
         mA = np.concatenate((np.diag(eigvals_A), np.zeros([nx - nA, ny])), axis=0)
-        print(mA.shape)
+        # print(mA.shape)
     A = rvsx().dot(mA).dot(rvsy()).T
 
     eigvals_B = np.linspace(mu_x**0.5, L_x**0.5, nx)

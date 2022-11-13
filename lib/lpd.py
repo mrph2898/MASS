@@ -5,7 +5,8 @@ import numpy as np
 
 def LiftedPrimalDual(
     prob, x_0, y_0, iterations,
-    log_freq=None, log_prefix=None, log_init=True, print_freq=None
+    log_freq=None, log_prefix=None, log_init=True, print_freq=None,
+    verbose=1
 ):
     """
     Algorithm: Primal-Dual algorithm for separable
@@ -99,8 +100,12 @@ def LiftedPrimalDual(
     output = {}
     #for key, value in metric_dict.items():
     #  output[key] = []
-
-    for k in range(iterations):
+    
+    bar = range(iterations)
+    if verbose > 0:
+        bar = tqdm(bar, desc="LPD")
+        
+    for k in bar:
         z_k = (x_k, y_k)
 
         if prob.mu_x == 0.0 or prob.mu_y == 0.0:
