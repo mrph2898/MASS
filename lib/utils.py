@@ -99,42 +99,49 @@ def main(problem, iteration,
         ):
     all_methods = {}
     
-    loss, x, y = opt.APDG(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, params=params['apdg'])
-    all_methods["APDG"] = {"marker": 'g--',
-                           "loss_hist": loss,
-                           "x_hist": x,
-                           "y_hist": y
-                          }
-    loss, x, y = opt.altgd(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, lr=params['altgd'])
-    all_methods["AltGD"] = {"marker": '--',
-                           "loss_hist": loss,
-                           "x_hist": x,
-                           "y_hist": y
-                          }
-    loss, x, y = opt.eg(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, lr=params['eg'])
-    all_methods["EG"] = {"marker": 'k-^',
-                           "loss_hist": loss,
-                           "x_hist": x,
-                           "y_hist": y
-                          }
-    loss, x, y = opt.omd(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, lr=params['omd'])
-    all_methods["OMD"] = {"marker": 'c-*',
-                           "loss_hist": loss,
-                           "x_hist": x,
-                           "y_hist": y
-                          }
-    # loss, x, y = opt.altGDAAM(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, lr=params['AA'], k=k)
-    # all_methods["AltGDA-RAM"] = {"marker": 'b->',
-    #                              "loss_hist": loss,
-    #                              "x_hist": x,
-    #                              "y_hist": y
-    #                             }
-    loss, x, y = opt.simgd(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, lr=params['simgd'])  
-    all_methods["SimGD"] = {"marker": 'm-',
-                            "loss_hist": loss,
-                            "x_hist": x,
-                            "y_hist": y
-                          }
+    if 'apdg' in params:
+        loss, x, y = opt.APDG(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, params=params['apdg'])
+        all_methods["APDG"] = {"marker": 'g--',
+                               "loss_hist": loss,
+                               "x_hist": x,
+                               "y_hist": y
+                              }
+    if 'altgd' in params:
+        loss, x, y = opt.altgd(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, lr=params['altgd'])
+        all_methods["AltGD"] = {"marker": '--',
+                               "loss_hist": loss,
+                               "x_hist": x,
+                               "y_hist": y
+                              }
+    if 'eg' in params:
+        loss, x, y = opt.eg(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, lr=params['eg'])
+        all_methods["EG"] = {"marker": 'k-^',
+                               "loss_hist": loss,
+                               "x_hist": x,
+                               "y_hist": y
+                              }
+    if "omd" in params:
+        loss, x, y = opt.omd(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, lr=params['omd'])
+        all_methods["OMD"] = {"marker": 'c-*',
+                               "loss_hist": loss,
+                               "x_hist": x,
+                               "y_hist": y
+                              }
+    if 'AA' in params:
+        loss, x, y = opt.altGDAAM(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, lr=params['AA'], k=k)
+        all_methods["AltGDA-RAM"] = {"marker": 'b->',
+                                     "loss_hist": loss,
+                                     "x_hist": x,
+                                     "y_hist": y
+                                    }
+    if 'sigmd' in params:
+        loss, x, y = opt.simgd(problem=problem, x0=x0.copy(), y0=y0.copy(), max_iter=iteration, lr=params['simgd'])  
+        all_methods["SimGD"] = {"marker": 'm-',
+                                "loss_hist": loss,
+                                "x_hist": x,
+                                "y_hist": y
+                              }
+        
     loss, x, y = lpd.LiftedPrimalDual(problem, x0, y0, iteration + 1)
     all_methods["LPD"] = {"marker": 'r-d',
                           "loss_hist": loss,
