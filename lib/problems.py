@@ -50,7 +50,7 @@ def get_A_fixed(lambda_min, lambda_max, n):
     S = np.diag(eigenvals)
 
     Q = ortho_group.rvs(dim=n)
-    return LA.sqrtm(Q.T @ S @ Q)
+    return sla.sqrtm(Q.T @ S @ Q).real
 
 
 class BaseSaddle(object):
@@ -134,8 +134,7 @@ class GeneralSaddle(BaseSaddle):
         return derivs[0], derivs[1]
     
     def fg_grads(self, x, y):
-        derivs = np.array([self.grad_f(x,y), self.grad_g(x,y)])
-        return derivs[0], derivs[1]
+        return self.grad_f(x), self.grad_g(y)
     
     
     def loss(self, x, y):

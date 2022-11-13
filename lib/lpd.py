@@ -4,32 +4,33 @@ import numpy as np
 
 
 def LiftedPrimalDual(
-  prob, x_0, y_0, iterations,
-  log_freq=None, log_prefix=None, log_init=True, print_freq=None,):
-  """
-  Algorithm: Primal-Dual algorithm for separable
-  smooth convex-concave minmax problems of the form
-  g(x, y) = f(x) + <y, Ax> - h(y)
-  [THO]: Lifted Primal-Dual Method for Bilinearly 
-  Coupled Smooth Minimax Optimization
-  Minimize:
-  f_m(x) = \\min_x \\max_y F(x, y)
-  Maximize:
-  g_m(y) = \\min_x F(x, y)
-  Solved as a convex-concave smooth-minimax problem
-  Args:
-    prob: FiniteMinimaxProb
-    K: None or int
-    z_0: None or np.array([m])
-    stepsize: None or float
-    log_freq: None or int
-    log_prefix: None or str
-    log_init: None or bool
-    print_freq: None of int
- 
-  Returns:
-    output: dict
-  """
+    prob, x_0, y_0, iterations,
+    log_freq=None, log_prefix=None, log_init=True, print_freq=None
+):
+    """
+    Algorithm: Primal-Dual algorithm for separable
+    smooth convex-concave minmax problems of the form
+    g(x, y) = f(x) + <y, Ax> - h(y)
+    [THO]: Lifted Primal-Dual Method for Bilinearly 
+    Coupled Smooth Minimax Optimization
+    Minimize:
+    f_m(x) = \\min_x \\max_y F(x, y)
+    Maximize:
+    g_m(y) = \\min_x F(x, y)
+    Solved as a convex-concave smooth-minimax problem
+    Args:
+      prob: FiniteMinimaxProb
+      K: None or int
+      z_0: None or np.array([m])
+      stepsize: None or float
+      log_freq: None or int
+      log_prefix: None or str
+      log_init: None or bool
+      print_freq: None of int
+    
+    Returns:
+      output: dict
+    """
   x_k, y_k = x_0, y_0
   x_kminus1, y_kminus1 = x_k, y_k
 

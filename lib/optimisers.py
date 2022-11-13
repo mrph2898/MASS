@@ -268,6 +268,7 @@ def APDG(problem,
              params['eta_y'] * params['beta_y'] * (A.dot(A.T.dot(y) + grad_x)) -
              params['eta_y'] * (grad_y - A.dot(x))
             )
+
         x_f = x_g + params['sigma_x'] * (x - x_hist[-1])
         y_f = y_g + params['sigma_y'] * (y - y_hist[-1])
         
