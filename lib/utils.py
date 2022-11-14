@@ -7,6 +7,7 @@ from IPython.display import display, Latex
 
 from lib.problems import BaseSaddle
 import lib.optimisers as opt
+import lib.cls_optimisers as copt
 import lib.lpd as lpd
 
 
@@ -95,38 +96,65 @@ def plot(x, y, z, dz_dx, dz_dy,
         
 def main(problem, iteration, 
          x0, y0,
-         params, one_dim=False, k=5,
+         params,
+         eps=1e-9,
          verbose=1
         ):
     all_methods = {}
     
     if 'apdg' in params:
-        loss, x, y = opt.APDG(problem=problem, x0=x0.copy(), y0=y0.copy(), 
-                              max_iter=iteration, params=params['apdg'], verbose=verbose)
+        # loss, x, y = opt.APDG(problem=problem, x0=x0.copy(), y0=y0.copy(), 
+        #                       max_iter=iteration, params=params['apdg'], verbose=verbose)
+        apdg_cls = copt.APDG(problem=problem, x0=x0.copy(), y0=y0.copy(), 
+                             eps=eps, stopping_criteria='loss',
+                             params=params['apdg'])
+        loss, x, y = apdg_cls(max_iter=iteration,
+                              verbose=verbose)
         all_methods["APDG"] = {"marker": 'g--',
                                "loss_hist": loss,
                                "x_hist": x,
                                "y_hist": y
                               }
     if 'altgd' in params:
-        loss, x, y = opt.altgd(problem=problem, x0=x0.copy(), y0=y0.copy(), 
-                               max_iter=iteration, lr=params['altgd'], verbose=verbose)
+        altgd_cls = copt.AltGD(problem=problem, x0=x0.copy(), y0=y0.copy(), 
+                       eps=eps, stopping_criteria='loss',
+                       params=params['altgd']
+                      )
+    
+        loss, x, y = altgd_cls(max_iter=iteration,
+                               verbose=verbose)
+        # loss, x, y = opt.altgd(problem=problem, x0=x0.copy(), y0=y0.copy(), 
+        #                        max_iter=iteration, lr=params['altgd'], verbose=verbose)
         all_methods["AltGD"] = {"marker": '--',
                                "loss_hist": loss,
                                "x_hist": x,
                                "y_hist": y
                               }
     if 'eg' in params:
-        loss, x, y = opt.eg(problem=problem, x0=x0.copy(), y0=y0.copy(), 
-                            max_iter=iteration, lr=params['eg'], verbose=verbose)
+        eg_cls = copt.EG(problem=problem, x0=x0.copy(), y0=y0.copy(), 
+                       eps=eps, stopping_criteria='loss',
+                       params=params['eg']
+                      )
+    
+        loss, x, y = eg_cls(max_iter=iteration,
+                            verbose=verbose)
+        # loss, x, y = opt.eg(problem=problem, x0=x0.copy(), y0=y0.copy(), 
+        #                     max_iter=iteration, lr=params['eg'], verbose=verbose)
         all_methods["EG"] = {"marker": 'k-^',
                                "loss_hist": loss,
                                "x_hist": x,
                                "y_hist": y
                               }
     if "omd" in params:
-        loss, x, y = opt.omd(problem=problem, x0=x0.copy(), y0=y0.copy(), 
-                             max_iter=iteration, lr=params['omd'], verbose=verbose)
+        omd_cls = copt.OMD(problem=problem, x0=x0.copy(), y0=y0.copy(), 
+                       eps=eps, stopping_criteria='loss',
+                       params=params['omd']
+                      )
+    
+        loss, x, y = omd_cls(max_iter=iteration,
+                             verbose=verbose)
+        # loss, x, y = opt.omd(problem=problem, x0=x0.copy(), y0=y0.copy(), 
+        #                      max_iter=iteration, lr=params['omd'], verbose=verbose)
         all_methods["OMD"] = {"marker": 'c-*',
                                "loss_hist": loss,
                                "x_hist": x,
@@ -134,8 +162,15 @@ def main(problem, iteration,
                               }
     if 'AA' in params:
         try:
-            loss, x, y = opt.altGDAAM(problem=problem, x0=x0.copy(), y0=y0.copy(),
-                                      max_iter=iteration, lr=params['AA'], k=k, verbose=verbose)
+            altgdaam_cls = copt.AltGDAAM(problem=problem, x0=x0.copy(), y0=y0.copy(), 
+                       eps=eps, stopping_criteria='loss',
+                       params=params['AA']
+                      )
+    
+            loss, x, y = altgdaam_cls(max_iter=iteration,
+                                 verbose=verbose)
+            # loss, x, y = opt.altGDAAM(problem=problem, x0=x0.copy(), y0=y0.copy(),
+            #                           max_iter=iteration, lr=params['AA'], k=k, verbose=verbose)
             all_methods["AltGDA-AM"] = {"marker": 'b->',
                                      "loss_hist": loss,
                                      "x_hist": x,
@@ -149,16 +184,45 @@ def main(problem, iteration,
                                     }
             
         
-    if 'sigmd' in params:
-        loss, x, y = opt.simgd(problem=problem, x0=x0.copy(), y0=y0.copy(),
-                               max_iter=iteration, lr=params['simgd'], verbose=verbose)  
+    if 'simgd' in params:
+        simgd_cls = copt.SimGD(problem=problem, x0=x0.copy(), y0=y0.copy(), 
+                       eps=eps, stopping_criteria='loss',
+                       params=params['simgd']
+                      )
+    
+        loss, x, y = simgd_cls(max_iter=iteration,
+                               verbose=verbose)
+        # loss, x, y = opt.simgd(problem=problem, x0=x0.copy(), y0=y0.copy(),
+        #                        max_iter=iteration, lr=params['simgd'], verbose=verbose)  
         all_methods["SimGD"] = {"marker": 'm-',
                                 "loss_hist": loss,
                                 "x_hist": x,
                                 "y_hist": y
                               }
+    if 'avg' in params:
+        avg_cls = copt.Avg(problem=problem, x0=x0.copy(), y0=y0.copy(), 
+                       eps=eps, stopping_criteria='loss',
+                       params=params['avg']
+                      )
+    
+        loss, x, y = avg_cls(max_iter=iteration,
+                             verbose=verbose)
+        # loss, x, y = opt.avg(problem=problem, x0=x0.copy(), y0=y0.copy(),
+        #                        max_iter=iteration, lr=params['avg'], verbose=verbose)  
+        all_methods["AVG"] = {"marker": 'y-h',
+                                "loss_hist": loss,
+                                "x_hist": x,
+                                "y_hist": y
+                              }
         
-    loss, x, y = lpd.LiftedPrimalDual(problem, x0, y0, iteration + 1, verbose=verbose)
+    lpd_cls = copt.LPD(problem=problem, x0=x0.copy(), y0=y0.copy(), 
+                       eps=eps, stopping_criteria='loss',
+                       params=params['lpd']
+                      )
+    
+    loss, x, y = lpd_cls(max_iter=iteration,
+                         verbose=verbose)
+    # loss, x, y = lpd.LiftedPrimalDual(problem, x0, y0, iteration + 1, verbose=verbose)
     all_methods["LPD"] = {"marker": 'r-d',
                           "loss_hist": loss,
                           "x_hist": x,
