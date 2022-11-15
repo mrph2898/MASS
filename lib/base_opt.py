@@ -51,6 +51,20 @@ class BaseSaddleOpt(object):
         self.problem = problem
         self.x = x0.copy()
         self.y = y0.copy()
+
+        if hasattr(self.problem, 'proj_x'):
+            self.proj_x = self.problem.proj_x
+        else:
+            self.proj_x = lambda x: x
+
+        if hasattr(self.problem, 'proj_y'):
+            self.proj_y = self.problem.proj_y
+        else:
+            self.proj_y = lambda y: y
+
+        self.x = self.proj_x(self.x)
+        self.y = self.proj_y(self.y)
+
         # self._name = None
         self.params = params
         
@@ -104,6 +118,8 @@ class BaseSaddleOpt(object):
             self._update_time()
             
             self.step()
+            self.x = self.proj_x(self.x)
+            self.y = self.proj_y(self.y)
             lo = self.problem.loss(self.x, self.y)
             self.loss.append(lo)  
             self.x_hist.append(self.x)
