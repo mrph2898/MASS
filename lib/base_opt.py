@@ -9,8 +9,6 @@ import scipy
 from scipy import linalg
 from numpy import linalg as LA
 from pyblas.level1 import dnrm2
-
-
 import sys
 
 sys.path.append("../")
@@ -19,6 +17,7 @@ import numpy as np
 from datetime import datetime
 from typing import Optional
 from .problems import BaseSaddle
+import lib.utils as ut
 
 
 class BaseSaddleOpt(object):
@@ -96,7 +95,10 @@ class BaseSaddleOpt(object):
             bar = tqdm(bar, desc=self.__class__.__name__)
             
         self._absolute_time = datetime.now()
-        
+        self.all_metrics = {"gap": [],
+                            "grad_norm": [],
+                            "func": []
+                           }
         for iter_count in bar:
             self.iter_count = iter_count
             if self.time > max_time:
@@ -105,6 +107,9 @@ class BaseSaddleOpt(object):
             
             self.step()
             lo = self.problem.loss(self.x, self.y)
+            metrics, _ = ut.metrics(self.problem, self.x, self.y)
+            for metric, val in metrics.items():
+                self.all_metrics[metric].append(val)
             self.loss.append(lo)  
             self.x_hist.append(self.x)
             self.y_hist.append(self.y)            

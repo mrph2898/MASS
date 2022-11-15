@@ -17,11 +17,11 @@ class SimGD(BaseSaddleOpt):
                 ):
         super().__init__(problem, x0, y0, eps, stopping_criteria, params)
         if params is None:
-            self.params = self._get_apdg_params(problem)
+            self.params = self._get_simgd_params(problem)
         
  
     @staticmethod
-    def _get_apdg_params(problem: BaseSaddle):
+    def _get_simgd_params(problem: BaseSaddle):
         L = max(problem.L_x, problem.L_y, problem.L_xy)
         return {"lr": problem.mu_y / (4*L**2)}
 
@@ -43,11 +43,11 @@ class AltGD(BaseSaddleOpt):
                 ):
         super().__init__(problem, x0, y0, eps, stopping_criteria, params)
         if params is None:
-            self.params = self._get_apdg_params(problem)
+            self.params = self._get_altgd_params(problem)
         
  
     @staticmethod
-    def _get_apdg_params(problem: BaseSaddle):
+    def _get_altgd_params(problem: BaseSaddle):
         L = max(problem.L_x, problem.L_y, problem.L_xy)
         return {"lr": 1 / (2*L)}
         
@@ -71,20 +71,21 @@ class Avg(BaseSaddleOpt):
         super().__init__(problem, x0, y0, eps, stopping_criteria, params)
         self.xavg, self.yavg = self.x.copy(), self.y.copy()
         if params is None:
-            self.params = self._get_apdg_params(problem)
+            self.params = self._get_avg_params(problem)
         
  
     @staticmethod
-    def _get_apdg_params(problem: BaseSaddle):
+    def _get_avg_params(problem: BaseSaddle):
         L = max(problem.L_x, problem.L_y, problem.L_xy)
         return {"lr": 1 / (2*L)}
         
         
     def step(self):
-        self.x = self.x - self.params['lr'] / np.sqrt(self.iter_count + 1)*(self.y)
-        self.y = self.y + self.params['lr'] / np.sqrt(self.iter_count + 1)*(self.x)        
-        self.xavg = self.xavg*(self.iter_count + 1)/(self.iter_count + 2) + self.x/(self.iter_count + 2)
-        self.yavg = self.yavg*(self.iter_count + 1)/(self.iter_count + 2) + self.y/(self.iter_count + 2)  
+        k = self.iter_count
+        self.x = self.x - self.params['lr'] / np.sqrt(k + 1)*(self.y)
+        self.y = self.y + self.params['lr'] / np.sqrt(k + 1)*(self.x)        
+        self.xavg = self.xavg*(k + 1)/(k + 2) + self.x/(k + 2)
+        self.yavg = self.yavg*(k + 1)/(k + 2) + self.y/(k + 2)  
         
 
 class EG(BaseSaddleOpt):
@@ -98,11 +99,11 @@ class EG(BaseSaddleOpt):
                 ):
         super().__init__(problem, x0, y0, eps, stopping_criteria, params)
         if params is None:
-            self.params = self._get_apdg_params(problem)
+            self.params = self._get_eg_params(problem)
         
  
     @staticmethod
-    def _get_apdg_params(problem: BaseSaddle):
+    def _get_eg_params(problem: BaseSaddle):
         L = max(problem.L_x, problem.L_y, problem.L_xy)
         return {"lr": 1 / (2*L)}
         
@@ -129,13 +130,13 @@ class OMD(BaseSaddleOpt):
         x_l, y_l = 0.5*x0, 0.5*y0
         self.g_xl, self.g_yl = self.problem.grad(x_l,y_l)
         if params is None:
-            self.params = self._get_apdg_params(problem)
+            self.params = self._get_omd_params(problem)
         
  
     @staticmethod
-    def _get_apdg_params(problem: BaseSaddle):
+    def _get_omd_params(problem: BaseSaddle):
         L = max(problem.L_x, problem.L_y, problem.L_xy)
-        return {"lr": 1 / (2*L)}
+        return {"lr": problem.mu_y / (4*L**2)}
 
     def step(self):
         g_x, g_y = self.problem.grad(self.x,self.y)
@@ -155,15 +156,22 @@ class AltGDAAM(BaseSaddleOpt):
                 ):
         super().__init__(problem, x0, y0, eps, stopping_criteria, params)
         self.fp = np.vstack((self.x, self.y))
-        self.aa = AA.numpyAA(2, params['k'], type2=params['type2'], reg=params['reg'])
         if params is None:
-            self.params = self._get_apdg_params(problem)
+            self.params = self._get_altgdaam_params(problem)
+        self.aa = AA.numpyAA(2, self.params['k'], 
+                             type2=self.params['type2'],
+                             reg=self.params['reg'])
         
  
     @staticmethod
-    def _get_apdg_params(problem: BaseSaddle):
+    def _get_altgdaam_params(problem: BaseSaddle):
         L = max(problem.L_x, problem.L_y, problem.L_xy)
-        return {"lr": 1 / (2*L)}
+        return {"lr": 1 / (2*L), 
+                 "k": 10,
+                 "type2": True,
+                 "reg": 1e-10,
+                 "gamma": 1e-26
+                }
         
 
     def step(self):
