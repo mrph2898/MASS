@@ -269,6 +269,9 @@ class APDG(BaseSaddleOpt):
         x_g = self.params['tau_x'] * self.x + (1 - self.params['tau_x']) * self.x_f
         y_g = self.params['tau_y'] * self.y + (1 - self.params['tau_y']) * self.y_f
 
+        x_g = self.proj_x(x_g)
+        y_g = self.proj_y(y_g)
+
         grad_x, grad_y = self.problem.fg_grads(x_g, y_g)
         self.x = (self.x + self.params['eta_x'] * self.params['alpha_x'] * (x_g - self.x) -
              self.params['eta_x'] * self.params['beta_x'] * (self.A.T.dot(self.A.dot(self.x) - grad_y)) - 
@@ -281,6 +284,9 @@ class APDG(BaseSaddleOpt):
 
         self.x_f = x_g + self.params['sigma_x'] * (self.x - self.x_hist[-1])
         self.y_f = y_g + self.params['sigma_y'] * (self.y - self.y_hist[-1])
+
+        self.x_f = self.proj_x(self.x_f)
+        self.y_f = self.proj_y(self.y_f)
         
         self.y_prev = self.y_hist[-1]
         
@@ -295,7 +301,7 @@ class LPD(BaseSaddleOpt):
                  params: dict
                 ):
         super().__init__(problem, x0, y0, eps, stopping_criteria, params)
-        self.x_prev, self.y_prev = x0.copy(), y0.copy()
+        self.x_prev, self.y_prev = self.x, self.y
         self._grad_f = lambda x: problem.grad_f(x) - problem.mu_x*x
         self._grad_h = lambda y: problem.grad_g(y) - problem.mu_y*y
 
@@ -393,6 +399,9 @@ class LPD(BaseSaddleOpt):
         else:
             bx_next =  (self.bx+ self.params['stepsize_xp']*x_next)/(1+self.params['stepsize_xp'])
             by_next =  (self.by+ self.params['stepsize_yp']*y_next)/(1+self.params['stepsize_yp'])
+
+        bx_next = self.proj_x(bx_next)
+        by_next = self.proj_y(by_next)
 
         grad_bx_next = self._grad_f(bx_next)
         grad_by_next = self._grad_h(by_next)
