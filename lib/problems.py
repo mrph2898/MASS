@@ -233,7 +233,7 @@ class BilinearQuadraticSaddle:
   
         eigvalsx = LA.eigvalsh(self.B)
         self.L_x, self.mu_x = eigvalsx[-1], eigvalsx[0]
-  
+        
         eigvalsxy = LA.eigvalsh(self.A @ self.A.T)
         self.L_xy, self.mu_xy = np.sqrt(eigvalsxy[-1]), np.sqrt(np.abs(eigvalsxy).min())
   

@@ -102,6 +102,13 @@ class BaseSaddleOpt(object):
             self.time = 0.
         
         self.loss = [self.problem.loss(self.x, self.y)]
+        self.all_metrics = {"gap": [],
+                            "grad_norm": [],
+                            "func": []
+                           }
+        metrics, _ = ut.metrics(self.problem, self.x, self.y)
+        for metric, val in metrics.items():
+            self.all_metrics[metric].append(val)
         self.x_hist, self.y_hist = [self.x], [self.y]
 
         bar = range(max_iter)
@@ -109,10 +116,7 @@ class BaseSaddleOpt(object):
             bar = tqdm(bar, desc=self.__class__.__name__)
             
         self._absolute_time = datetime.now()
-        self.all_metrics = {"gap": [],
-                            "grad_norm": [],
-                            "func": []
-                           }
+        
         for iter_count in bar:
             self.iter_count = iter_count
             if self.time > max_time:
