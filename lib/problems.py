@@ -1,7 +1,7 @@
 from typing import List, Optional
 from autograd import grad, jacobian, elementwise_grad
 import numpy as np
-from numpy import linalg as LA
+from scipy import linalg as LA
 from scipy.linalg import pinv
 import scipy.linalg as sla
 import numpy.matlib as mt
@@ -187,6 +187,7 @@ class BilinearQuadraticSaddle:
     def __init__(
         self, A, B=None, C=None, b=None, c=None,
         Dx=None, Dy=None, dual_func=None,
+        proj_x=None, proj_y=None
     ):
         """
         Args:
@@ -233,22 +234,28 @@ class BilinearQuadraticSaddle:
   
         eigvalsx = LA.eigvalsh(self.B)
         self.L_x, self.mu_x = eigvalsx[-1], eigvalsx[0]
+        if abs(eigvalsx[0] - 0.) < 1e-8:
+            self.mu_x = 0.
         
-        eigvalsxy = LA.eigvalsh(self.A @ self.A.T)
-        self.L_xy, self.mu_xy = np.sqrt(eigvalsxy[-1]), np.sqrt(np.abs(eigvalsxy).min())
+        eigvalsxy = LA.svdvals(self.A @ self.A.T)
+        self.L_xy, self.mu_xy = np.sqrt(eigvalsxy[0]), np.sqrt(eigvalsxy[-1])
   
-        eigvalsyx = LA.eigvalsh(self.A.T @ self.A)
-        self.L_yx, self.mu_yx = np.sqrt(eigvalsyx[-1]), np.sqrt(np.abs(eigvalsyx).min())
+        eigvalsyx = LA.svdvals(self.A.T @ self.A)
+        self.L_yx, self.mu_yx = np.sqrt(eigvalsyx[0]), np.sqrt(eigvalsyx[-1])
   
         eigvalsy = LA.eigvalsh(self.C)
         self.L_y, self.mu_y = eigvalsy[-1], eigvalsy[0]
+        if abs(eigvalsy[0] - 0.) < 1e-8:
+            self.mu_y = 0.
   
         self.L = max(self.L_x, self.L_xy, self.L_y)
   
         self.xopt = None
         self.yopt = None
-        self._proj_x = None
-        self._proj_y = None
+        self._proj_x = proj_x
+        self._proj_y = proj_y
+        self.proj_x = lambda x: x if proj_x is None else proj_x(x)
+        self.proj_y = lambda x: x if proj_y is None else proj_y(x)
         
 
     @classmethod
