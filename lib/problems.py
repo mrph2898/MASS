@@ -437,7 +437,6 @@ class BilinearQuadraticSaddle:
                 except scipy.linalg.LinAlgError:
                     opt = scipy.linalg.lstsq(matrix, vector, check_finite=True)[0]
                 self.xopt, self.yopt = opt[:self.dx], opt[self.dx:]
-  
             distance_squared = LA.norm(np.block([self.xopt, self.yopt]) - np.block([x, y]))
         else:
             distance_squared = np.inf
