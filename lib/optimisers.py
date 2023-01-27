@@ -8,7 +8,6 @@ import math
 import scipy 
 from scipy import linalg
 from numpy import linalg as LA
-from pyblas.level1 import dnrm2
 
 import lib.anderson_acceleration as AA
 from lib.problems import BaseSaddle

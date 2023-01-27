@@ -3,7 +3,8 @@ import math
 import scipy 
 from scipy import linalg
 from numpy import linalg as LA
-from pyblas.level1 import dnrm2
+# from pyblas.level1 import dnrm2
+from scipy.linalg.blas import dnrm2
 
 
 class numpyAA:
@@ -40,8 +41,8 @@ class numpyAA:
             self.Y[:,col] = y
             A = self.Y[:,0:mk].transpose() @ self.Y[:,0:mk]
             b = self.Y[:,0:mk].transpose()@ g
-            normS = dnrm2(self._dimension, self.S[:,0:mk],1)
-            normY = dnrm2(self._dimension, self.Y[:,0:mk],1)
+            normS = dnrm2(self.S[:,0:mk], self._dimension, incx=1)
+            normY = dnrm2(self.Y[:,0:mk], self._dimension, incx=1)
             reg = normS**2 + normY**2
 #             try:
 #                 res =  scipy.linalg.lapack.dgesv(A + self.reg * reg * np.eye(mk), b)
@@ -76,8 +77,8 @@ class numpyAA:
             self.Y[:,col] = g - self.gprev
             A = self.S[:,0:mk].transpose() @ self.Y[:,0:mk]
             b = self.S[:,0:mk].transpose()@ g
-            normS = dnrm2(self._dimension, self.S[:,0:mk],1)
-            normY = dnrm2(self._dimension, self.Y[:,0:mk],1)
+            normS = dnrm2(self.S[:,0:mk], self._dimension, incx=1)
+            normY = dnrm2(self.Y[:,0:mk], self._dimension, incx=1)
             reg = normS**2 + normY**2
             lstsq_solution = linalg.lstsq(A + self.reg * reg * np.eye(mk), b)
             gamma_k = lstsq_solution[0]

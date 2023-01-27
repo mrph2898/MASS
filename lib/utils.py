@@ -75,10 +75,10 @@ def metrics(problem, x, y):
     metrics_dict['grad_norm'] = ((grad_x**2).sum() + (grad_y**2).sum())**0.5
     metrics_dict['func'] = problem.F(x, y)
 
-    metrics_string = 'gap={:2.2g},|grad|={:2.2g},func={:.2g}'.format(
-      metrics_dict['gap'], metrics_dict['grad_norm'], metrics_dict['func']
-    )
-
+    metrics_string = ""
+    if problem.primal_func is not None and problem.dual_func is not None:
+        metrics_string += f"gap={metrics_dict['gap']:2.2g}"
+    metrics_string += ",|grad|={metrics_dict['grad_norm']:2.2g},func={metrics_dict['func']:.2g}"
     return metrics_dict, metrics_string
     
 
@@ -233,14 +233,8 @@ def main(problem, iteration,
                 "iters_spent": apdg_cls.iter_count
             }
         except ValueError:
-            all_methods["AltGDA-AM"] = {
-                "class": altgdaam_cls,
-                "marker": 'b->',
-                "loss_hist": [np.nan],
-                "x_hist": [np.nan],
-                "y_hist": [np.nan],
-                "iters_spent": np.nan
-            }
+            print("AltGDA-AM couldn't be used in such parameters' settings")
+            
             
         
     if 'simgd' in params:

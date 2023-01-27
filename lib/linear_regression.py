@@ -54,8 +54,11 @@ class LinearRegression:
 
     self.xopt = None
     self.yopt = None
-
-    print(self.y)
+    self.primal_func = None
+    self.dual_func = None
+    self._proj_x = None
+    self._proj_y = None
+    
 
   @classmethod
   def with_parameters(cls, nx, ny, L_x_mu_x, L_xy, mu_xy, L_y=None, mu_y=None):
