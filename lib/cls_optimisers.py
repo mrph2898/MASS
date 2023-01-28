@@ -5,7 +5,6 @@ from .base_opt import BaseSaddleOpt
 from .problems import BaseSaddle
 
 
-
 class SimGD(BaseSaddleOpt):
     def __init__(self,
                  problem: BaseSaddle,
@@ -417,3 +416,66 @@ class LPD(BaseSaddleOpt):
         self.grad_by_prev, self.grad_by = self.grad_by, grad_by_next
         
 
+class SepMiniMax(BaseSaddleOpt):
+    def __init__(self,
+                 problem: BaseSaddle,
+                 x0: np.ndarray, 
+                 y0: np.ndarray,
+                 eps: float,
+                 stopping_criteria: Optional[str],
+                 params: dict
+                ):
+        """
+        Implementation of Sidford et al. Separable minimax optimisation.
+        https://arxiv.org/pdf/2202.04640.pdf
+        """
+        super().__init__(problem, x0, y0, eps, stopping_criteria, params)
+        if params is None:
+            self.params = self._get_smm_params(problem)
+        self.x_f = x0.copy()
+        self.y_g = y0.copy()
+        
+ 
+    @staticmethod
+    def _get_smm_params(problem: BaseSaddle):
+        """
+        Optimal lambda is taken from Lemma 6 (Relative Lipschitzness)
+        """
+        _lambda = (1 + (problem.L_x/problem.mu_x)**.5 +(problem.L_y/problem.mu_y)**.5 +
+                   problem.L_xy/(problem.mu_x*problem.mu_y)**.5
+                  ) 
+        return {"lambda": _lambda}
+        
+        
+    def step(self):
+        _df, _dg = self.problem.fg_grads(self.x_f, self.y_g)
+        bilinear_dx, bilinear_dy = self.problem.A.T.dot(self.y), self.problem.A.dot(self.x)
+        Phi_x = self.problem.mu_x*self.x + _df + bilinear_dx
+        Phi_y = self.problem.mu_y*self.y + _dg - bilinear_dy
+        
+        # Gradient step
+        x_half = self.x - (self.params["lambda"]*self.problem.mu_x)**-1 * Phi_x
+        y_half = self.y - (self.params["lambda"]*self.problem.mu_y)**-1 * Phi_y
+        xf_half = (1 - 1/self.params["lambda"])*self.x_f + 1/self.params["lambda"]*self.x
+        yg_half = (1 - 1/self.params["lambda"])*self.y_g + 1/self.params["lambda"]*self.y
+        
+        _df, _dg = self.problem.fg_grads(xf_half, yg_half)
+        bilinear_dx, bilinear_dy = self.problem.A.T.dot(y_half), self.problem.A.dot(x_half)
+        Phi_x = self.problem.mu_x*x_half + _df + bilinear_dx
+        Phi_y = self.problem.mu_y*y_half + _dg - bilinear_dy
+        
+        # Extragradient step
+        self.x = (1/(1 + self.params["lambda"]) * x_half +
+                  self.params["lambda"]/(1 + self.params["lambda"]) * self.x - 
+                  1/((1 + self.params["lambda"])*self.problem.mu_x)*Phi_x
+                 )
+        self.y = (1/(1 + self.params["lambda"]) * y_half +
+                  self.params["lambda"]/(1 + self.params["lambda"]) * self.y - 
+                  1/((1 + self.params["lambda"])*self.problem.mu_y)*Phi_y
+                 )
+        
+        self.x_f = (self.params["lambda"]/(1 + self.params["lambda"]) * self.x_f +
+                    1/(1 + self.params["lambda"]) * x_half
+                   )
+        self.y_g = ((self.params["lambda"]/(1 + self.params["lambda"]) * self.y_g +
+                     1/(1 + self.params["lambda"]) * y_half))

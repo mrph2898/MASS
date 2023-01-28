@@ -159,6 +159,7 @@ def main(problem, iteration,
             "y_hist": y,
             "iters_spent": apdg_cls.iter_count
         }
+        
     if 'altgd' in params:
         altgd_cls = copt.AltGD(problem=problem, x0=x0.copy(), y0=y0.copy(), 
                        eps=eps, stopping_criteria='loss',
@@ -177,6 +178,26 @@ def main(problem, iteration,
             "y_hist": y,
             "iters_spent": apdg_cls.iter_count
         }
+        
+    if 'smm' in params:
+        smm_cls = copt.SepMiniMax(problem=problem, x0=x0.copy(), y0=y0.copy(), 
+                       eps=eps, stopping_criteria='loss',
+                       params=params['smm']
+                      )
+    
+        loss, x, y = smm_cls(max_iter=iteration,
+                               verbose=verbose)
+        # loss, x, y = opt.altgd(problem=problem, x0=x0.copy(), y0=y0.copy(), 
+        #                        max_iter=iteration, lr=params['altgd'], verbose=verbose)
+        all_methods["SeparateMiniMax"] = {
+            "class": smm_cls,
+            "marker": '--',
+            "loss_hist": loss,
+            "x_hist": x,
+            "y_hist": y,
+            "iters_spent": smm_cls.iter_count
+        }
+        
     if 'eg' in params:
         eg_cls = copt.EG(problem=problem, x0=x0.copy(), y0=y0.copy(), 
                        eps=eps, stopping_criteria='loss',
@@ -195,6 +216,7 @@ def main(problem, iteration,
             "y_hist": y,
             "iters_spent": apdg_cls.iter_count
         }
+        
     if "omd" in params:
         omd_cls = copt.OMD(problem=problem, x0=x0.copy(), y0=y0.copy(), 
                        eps=eps, stopping_criteria='loss',
@@ -213,6 +235,7 @@ def main(problem, iteration,
             "y_hist": y,
             "iters_spent": apdg_cls.iter_count
         }
+        
     if 'AA' in params:
         try:
             altgdaam_cls = copt.AltGDAAM(problem=problem, x0=x0.copy(), y0=y0.copy(), 
@@ -234,9 +257,7 @@ def main(problem, iteration,
             }
         except ValueError:
             print("AltGDA-AM couldn't be used in such parameters' settings")
-            
-            
-        
+
     if 'simgd' in params:
         simgd_cls = copt.SimGD(problem=problem, x0=x0.copy(), y0=y0.copy(), 
                        eps=eps, stopping_criteria='loss',
@@ -255,6 +276,7 @@ def main(problem, iteration,
             "y_hist": y,
             "iters_spent": apdg_cls.iter_count
         }
+        
     if 'avg' in params:
         avg_cls = copt.Avg(problem=problem, x0=x0.copy(), y0=y0.copy(), 
                        eps=eps, stopping_criteria='loss',
@@ -273,6 +295,7 @@ def main(problem, iteration,
             "y_hist": y,
             "iters_spent": apdg_cls.iter_count
         }
+        
     if 'lpd' in params:
         lpd_cls = copt.LPD(problem=problem, x0=x0.copy(), y0=y0.copy(), 
                            eps=eps, stopping_criteria='loss',
@@ -290,5 +313,5 @@ def main(problem, iteration,
             "y_hist": y,
             "iters_spent": apdg_cls.iter_count
         }
-    # allloss[4], allxpath[4], allypath[4]= simGDAAM(problem, x0, y0, iteration, lr=lrset['AA'], k=k)   
+        
     return all_methods
