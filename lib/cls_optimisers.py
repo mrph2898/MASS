@@ -1,5 +1,7 @@
-from typing import Optional
+from typing import Optional, Union, Callable
 import numpy as np
+import numpy.linalg as LA
+from autograd import grad
 import lib.anderson_acceleration as AA
 from .base_opt import BaseSaddleOpt
 from .problems import BaseSaddle
@@ -479,3 +481,216 @@ class SepMiniMax(BaseSaddleOpt):
                    )
         self.y_g = ((self.params["lambda"]/(1 + self.params["lambda"]) * self.y_g +
                      1/(1 + self.params["lambda"]) * y_half))
+        
+        
+class FOAM(BaseSaddleOpt):
+    """
+    FOAM algorithm from https://arxiv.org/pdf/2205.05653.pdf 
+    """
+    def __init__(self,
+                 problem: BaseSaddle,
+                 x0: np.ndarray, 
+                 y0: np.ndarray,
+                 eps: float,
+                 stopping_criteria: Optional[str],
+                 params: dict
+                ):
+        super().__init__(problem, x0, y0, eps, stopping_criteria, params)
+        self.x_f, self.y_f = x0.copy(), y0.copy()
+        self.z_f = x0.copy()
+        self.z = x0.copy()
+        self.A = problem.A
+        if params is None:
+            self.params = self._get_foam_params(problem)
+        
+        
+    @staticmethod
+    def _get_foam_params(problem: BaseSaddle):
+        """
+        Setting the optimal params from pp.8-10
+        """
+        L_x, L_y, mu_x, mu_y = problem.L_x, problem.L_y, problem.mu_x, problem.mu_y
+        L_xy, mu_xy, mu_yx = problem.L_xy, problem.mu_xy, problem.mu_yx
+        L = max(L_x, L_y, L_xy)
+    
+        theta = 8/mu_x
+        eta_z = 0.5/mu_x
+        gamma_x = 8/mu_x
+        gamma_y = theta
+        M = 2*max(gamma_x*L, gamma_y*(L + theta**-1))
+        alpha = min(1, (theta*mu_y)**.5)
+        
+        eta_y = min(1/(2*mu_y), theta/(2*alpha))
+        _lambda = 1/(5**.5 * M)
+
+        opt_params = {
+                      "theta": theta,
+                      "gamma_x": gamma_x,
+                      "gamma_y": gamma_y,
+                      "eta_z": eta_z,
+                      "eta_y": eta_y,
+                      "alpha": alpha,
+                      "lambda": _lambda
+                     }
+        return opt_params
+        
+    def a_x(self, x, y, z_g):
+        g_x, _ = self.problem.grad(x, y)
+        return g_x - 0.5*self.problem.mu_x*x - 0.5*z_g
+    
+    def a_y(self, x, y, y_g):
+        _, g_y = self.problem.grad(x, y)
+        return -g_y - 1/self.params["theta"] * (y - y_g)
+    
+    def beta(self, t):
+        return 2/(t + 3)
+        
+    def step(self):
+        _alpha = self.params['alpha']
+        _theta = self.params["theta"] 
+        _eta_z = self.params["eta_z"] 
+        _eta_y = self.params["eta_y"] 
+        _gamma_x = self.params["gamma_x"] 
+        _gamma_y = self.params["gamma_y"]
+        _lambda = self.params["lambda"]
+        
+        z_g = _alpha * self.z + (1 - _alpha) * self.z_f
+        y_g = _alpha * self.y + (1 - _alpha) * self.y_f
+        
+        _x_m1, _y_m1 = -self.problem.mu_x**-1 * z_g, y_g
+        
+        x_k_0 = self.problem.prox_f(_x_m1 - _gamma_x*_lambda*self.a_x(_x_m1, _y_m1, z_g),
+                                    scale=_gamma_x*_lambda)
+        y_k_0 = self.problem.prox_g(_y_m1 - _gamma_y*_lambda*self.a_y(_x_m1, _y_m1, y_g),
+                                    scale=_gamma_y*_lambda)
+        x_k = x_k_0.copy()
+        y_k = y_k_0.copy()
+        b_x_k = (_gamma_x*_lambda)**-1 * (_x_m1 - _gamma_x*_lambda*self.a_x(_x_m1, _y_m1, z_g) - x_k_0)
+        b_y_k = (_gamma_y*_lambda)**-1 * (_y_m1 - _gamma_y*_lambda*self.a_y(_x_m1, _y_m1, y_g) - y_k_0)
+        
+        t = 0
+        while (_gamma_x*LA.norm(self.a_x(x_k, y_k, z_g) + b_x_k)**2 + 
+               _gamma_y*LA.norm(self.a_y(x_k, y_k, y_g) + b_y_k)**2) > (
+            1/_gamma_x*LA.norm(x_k - _x_m1)**2 + 
+            1/_gamma_y*LA.norm(y_k - _y_m1)**2
+        
+        ):
+            x_k_half = x_k + self.beta(t)*(x_k_0 - x_k) - _gamma_x*_lambda*(self.a_x(x_k, y_k, z_g) + b_x_k)  
+            y_k_half = y_k + self.beta(t)*(y_k_0 - y_k) - _gamma_y*_lambda*(self.a_y(x_k, y_k, y_g) + b_y_k)  
+            x_k_next = self.problem.prox_f(x_k + self.beta(t)*(x_k_0 - x_k) -
+                                           _gamma_x*_lambda*self.a_x(x_k_half, y_k_half, z_g),
+                                           scale=_gamma_x*_lambda
+                                          )
+            y_k_next = self.problem.prox_g(y_k + self.beta(t)*(y_k_0 - y_k) -
+                                           _gamma_y*_lambda*self.a_y(x_k_half, y_k_half, y_g),
+                                           scale=_gamma_y*_lambda
+                                          )
+            b_x_k = (_gamma_x*_lambda)**-1 * (x_k + self.beta(t)*(x_k_0 - x_k) -
+                                              _gamma_x*_lambda*self.a_x(x_k_half, y_k_half, z_g) - x_k_next)
+            b_y_k = (_gamma_y*_lambda)**-1 * (y_k + self.beta(t)*(y_k_0 - y_k) -
+                                              _gamma_y*_lambda*self.a_y(x_k_half, y_k_half, y_g) - y_k_next)
+            x_k, y_k = x_k_next, y_k_next
+            t += 1
+        t_k = t    
+        
+        self.x_f = x_k
+        self.y_f = y_k
+        
+        g_x, g_y = self.problem.grad(self.x_f, self.y_f)
+        self.z_f = g_x - self.problem.mu_x*self.x_f + b_x_k
+        
+        w_f = -g_y - self.problem.mu_y*self.y_f + b_y_k
+        self.z = (self.z + _eta_z*self.problem.mu_x**-1 * (self.z_f - self.z) - 
+                  _eta_z*(self.x_f + self.problem.mu_x**-1 * self.z_f))
+        self.y = (self.y + _eta_y*self.problem.mu_y**-1 * (self.y_f - self.y) - 
+                  _eta_y*(w_f + self.problem.mu_y * self.y_f))
+
+        self.x = -self.problem.mu_x**-1 * self.z
+        
+        self.x = self.proj_x(self.x)
+        self.y = self.proj_y(self.y)
+        
+
+class AccEG(BaseSaddleOpt):
+    def __init__(self,
+                 problem: BaseSaddle,
+                 inner_optimiser: BaseSaddleOpt,
+                 inner_max_iter: int,
+                 x0: np.ndarray, 
+                 y0: np.ndarray,
+                 eps: float,
+                 stopping_criteria: Optional[str],
+                 params: dict
+                ):
+        super().__init__(problem, x0, y0, eps, stopping_criteria, params)
+        if params is None:
+            self.params = self._get_acceg_params(problem)
+        self.x_f = x0.copy()
+        self.inner_opt = inner_optimiser
+        self.inner_max_iter = inner_max_iter
+        
+ 
+    @staticmethod
+    def _get_acceg_params(problem: BaseSaddle):
+        _mu = min(problem.mu_x, problem.mu_y)
+        L_p = problem.L_x
+        tau = min(1, _mu**.5/(2*L_p**.5))
+        theta = 0.5/L_p
+        eta = min(0.5/_mu, 0.5/(_mu*L_p)**.5)
+        alpha = _mu
+        return {"tau": tau,
+                "theta": theta,
+                "eta": eta,
+                "alpha": alpha
+               }
+    
+    
+    def step(self):
+        x_g = self.params["tau"]*self.x + (1 - self.params["tau"])*self.x_f
+        
+        subproblem = BaseSaddle(A=self.problem.A)
+        # min max f(x) + <y, Ax> - g(y)
+        
+        grad_p, _ = self.problem.fg_grads(x_g, self.y)
+        subproblem.f = lambda x: 0.5/self.params["theta"]*x@x + (grad_p - 1/self.params["theta"]*x_g)@x
+        subproblem.mu_x = subproblem.L_x = self.params["theta"]**-1
+        subproblem._optimiser_params = self.params
+        subproblem._optimiser_params["right_part"] = 1/self.params["theta"]*x_g + grad_p
+        subproblem.g = self.problem.g
+        subproblem.C = self.problem.C 
+        subproblem.mu_y = self.problem.mu_y
+        subproblem.L_y = self.problem.L_y
+        subproblem.mu_xy = self.problem.mu_xy 
+        subproblem.mu_yx = self.problem.mu_yx 
+        subproblem.L_xy = self.problem.L_xy
+        subproblem.xopt, subproblem.yopt = self.problem.xopt,self.problem.yopt
+        subproblem.primal_func = self.problem.primal_func
+        subproblem.dual_func = lambda y, x: subproblem.F(-self.params["theta"]*(grad_p - 1/self.params["theta"]*x_g + subproblem.A.T@y), y)
+        subproblem.prox_f = lambda v, scale: (v + 1/self.params["theta"]*x_g - grad_p)*self.params["theta"]/(1 + self.params["theta"])
+        subproblem.prox_g = self.problem.prox_g
+        subproblem.grad_f = grad(subproblem.f)
+        subproblem.grad_g = grad(subproblem.g)
+        
+        inner_optimiser = self.inner_opt(problem=subproblem, x0=x_g,
+                                         y0=self.y, eps=self.eps,
+                                         stopping_criteria='sliding',
+                                         params=None
+                                        )
+        
+        _loss, _, _ = inner_optimiser(max_iter=self.inner_max_iter,
+                                         verbose=0)
+        # plt.plot(_loss)
+        # plt.show()
+        # print(inner_optimiser.iter_count)
+        self.x_f = inner_optimiser.x
+        self.y = inner_optimiser.y
+        
+        # TODO: take grad without y
+        gx, _ = self.problem.fg_grads(self.x_f, inner_optimiser.y)
+        _A = self.problem.A
+        _C = self.problem.C
+        gx += 3/4*_A.T @ LA.inv(_C) @ _A @ self.x_f
+        self.x = (self.x + 
+                  self.params['eta']*self.params['alpha']*(self.x_f - self.x) - 
+                  self.params['eta']*gx
+                 ) 

@@ -73,8 +73,12 @@ class BaseSaddleOpt(object):
             self.stopping_criteria = self.stopping_criteria_grad_absolute
         elif stopping_criteria == 'loss':
             self.stopping_criteria = self.stopping_criteria_loss
+        elif stopping_criteria == 'sliding':
+            self.stopping_criteria = self.stopping_criteria_sliding
         elif stopping_criteria == None:
             self.stopping_criteria = self.stopping_criteria_none
+        elif callable(stopping_criteria):
+            self.stopping_criteria = stopping_criteria
         else:
             raise ValueError('Unknown stopping criteria type: "{}"' \
                              .format(stopping_criteria))
@@ -154,6 +158,16 @@ class BaseSaddleOpt(object):
     
     def stopping_criteria_loss(self):
         return self.problem.loss(self.x, self.y) <= self.eps
+    
+    def stopping_criteria_sliding(self):
+        # TODO: calculate grad truely. Now it's only for quadratic case
+        # return np.sum(self.problem.grad(self.x, self.y)[0]**2) <= 0.5*self.problem.L_x**2*np.sum((self.x_hist[0] - x_opt)**2)
+        _A = self.problem.A
+        _C = self.problem.C
+        f_grad_x, _ = self.problem.fg_grads(self.x, self.y)
+        x_opt = LA.solve(3/4*_A.T.dot(LA.inv(_C)).dot(_A) + 1/self.problem._optimiser_params["theta"]*np.eye(self.x.shape[0]),
+                         self.problem._optimiser_params["right_part"])
+        return np.sum(LA.norm(f_grad_x + 3/4 * _A.T.dot(LA.inv(_C)).dot(_A).dot(self.x))**2) <= 0.5*self.problem.L_x**2*np.sum((self.x_hist[0] - x_opt)**2)
 
     def stopping_criteria_none(self):
         return False

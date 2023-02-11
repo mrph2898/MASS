@@ -29,7 +29,7 @@ class LinearRegression:
     # L_y = - Lipschitz constant of grad_y w.r.t y
     # mu_y = - Strong concavity constant of grad_y w.r.t y
 
-    self.l = l
+    self.rho = l
     self.L_x = l
     self.mu_x = self.L_x
 
@@ -44,8 +44,8 @@ class LinearRegression:
     eigvalsyx = LA.eigvalsh(self.A.T @ self.A)
     self.L_yx, self.mu_yx = np.sqrt(eigvalsyx[-1]), np.sqrt(np.abs(eigvalsyx).min())
 
-    self.L_y = 1/2
-    self.mu_y = 1/2
+    self.L_y = 2
+    self.mu_y = 2
 
     self.L = max(self.L_x, self.L_xy, self.L_y)
 
@@ -54,8 +54,6 @@ class LinearRegression:
 
     self.xopt = None
     self.yopt = None
-    self.primal_func = None
-    self.dual_func = None
     self._proj_x = None
     self._proj_y = None
     
@@ -74,16 +72,49 @@ class LinearRegression:
     return cls(l=L_x_mu_x, A=A, y=np.random.randn(ny))
 
   def f(self, x):
-    return self.l / 2 * np.linalg.norm(x)**2
+    return self.rho / 2 * np.linalg.norm(x)**2
 
   def g(self, y):
-    return 1 / 4 * np.linalg.norm(y)**2 + self.y.T @ y
+    return y.T @ y
 
   def F(self, x, y):
     return self.f(x) + y.T @ self.A @ x - self.g(y)
 
+  def primal_func(self, x, y=None):
+    """
+    Computes the function value
+    f_max(x) = \max_y F(x, y)
+
+    F(x, y) = f(x) + <y, Ax> - g(y)
+    f(x) = rho*0.5 <x, x>
+    g(y) = <y, y>
+    Args:
+        x: np.array([dx])
+    Returns:
+        f_max(x): real function value
+    """
+    y_max = 0.5*self.A.dot(x)
+
+    return self.F(x, y_max)
+
+  def dual_func(self, y, x=None, func_lb=None):
+    """
+    Computes the function value
+    g_min(y) = \min_x F(x, y)
+
+    F(x, y) = f(x) + <y, Ax> - g(y)
+    f(x) = rho*0.5 <x, x>
+    g(y) = <y, y>
+    Args:
+        y: np.array([dy])
+    Returns:
+        h_min(y): real function value
+    """
+    x_min = -1/self.rho * self.A.T.dot(y)
+    return self.F(x_min, y)
+
   # def grad_f(self, x):
-  #   return self.l * x
+  #   return self.rho * x
 
   # def grad_g(self, y):
   #   return grad_y
@@ -107,7 +138,7 @@ class LinearRegression:
   def loss(self, x, y):
     if self.xopt is None and self.yopt is None:
         from sklearn.linear_model import Ridge
-        ridge = Ridge(alpha=self.l/2, fit_intercept=False)
+        ridge = Ridge(alpha=self.rho/2, fit_intercept=False)
         ridge.fit(self.A, self.y)
         self.xopt = ridge.coef_
 

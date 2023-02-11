@@ -32,12 +32,13 @@ class LogisticRegression:
     if L_y == None:
       L_y = 10
 
-    self.l = l
+    self.rho = l
     self.L_x = l
     self.mu_x = self.L_x
 
     self.n = A.shape[0]
-    self.y = y
+    self.y = y.astype(int)
+    assert set(np.unique(self.y)) == {0, 1}, f"Labels should be 0 and 1, now they are {set(np.unique(self.y))}"
 
     self.A = A / self.n
 
@@ -57,8 +58,15 @@ class LogisticRegression:
 
     self.xopt = None
     self.yopt = None
-    self.primal_func = None
-    self.dual_func = None
+    if self.xopt is None or self.yopt is None:
+        from sklearn.linear_model import LogisticRegression
+        log_reg = LogisticRegression(penalty='l2', C=1/(self.n * self.rho), multi_class='ovr', fit_intercept=False)
+        log_reg.fit(self.A * self.n, self.y)
+        self.xopt = log_reg.coef_[0]
+
+        matrix = self.A.T
+        vector = -self.grad_f(self.xopt)
+        self.yopt = scipy.linalg.lstsq(matrix, vector, check_finite=True)[0]
     self._proj_x = None
     self._proj_y = None
     
@@ -76,20 +84,56 @@ class LogisticRegression:
     else:
         mA = np.concatenate((np.diag(eigvals_A), np.zeros([nx - nA, ny])), axis=0)
     A = rvsx().dot(mA).dot(rvsy()).T
-    return cls(l=L_x_mu_x, A=A, y=np.random.randint(0, 2, (ny)) * 2 - 1)
+    return cls(l=L_x_mu_x, A=A, y=np.random.randint(0, 2, (ny)))
 
   def f(self, x):
-    return self.l / 2 * np.linalg.norm(x)**2
+    return self.rho / 2 * np.linalg.norm(x)**2
 
   def g(self, y):
-    ny = y * -self.y
-    return 1 / self.n * (ny.T @ np.log(ny) + (1 - ny).T @ np.log(1 - ny))
+    # ny = y * -self.y
+    y = np.clip(1 / (1 + np.exp(-y)), 0., 1.)
+    return 1 / self.n * (self.y.T @ np.log(y + 1e-12) +
+                         (1 - self.y).T @ np.log(1 - y +1e-12))
 
   def F(self, x, y):
     return self.f(x) + y.T @ self.A @ x - self.g(y)
 
+  def primal_func(self, x, y=None):
+    """
+    Computes the function value
+    f_max(x) = \max_y F(x, y)
+
+    F(x, y) = f(x) + <y, Ax> - g(y)
+    f(x) = rho * 0.5 <x, x>
+    g(y) = 1/n * (<y_true, log(sigma(y))> + <(1 - y_true), log(1 - sigma(y))>)
+    Args:
+        x: np.array([dx])
+    Returns:
+        f_max(x): real function value
+    """
+    
+    # return self.F(x, self.y)
+    # Unfair, but it's true
+    return self.F(x, self.yopt)
+
+  def dual_func(self, y, x=None, func_lb=None):
+    """
+    Computes the function value
+    g_min(y) = \min_x F(x, y)
+
+    F(x, y) = f(x) + <y, Ax> - g(y)
+    f(x) = rho * 0.5 <x, x>
+    g(y) = 1/n * (<y_true, log(sigma(y))> + <(1 - y_true), log(1 - sigma(y))>)
+    Args:
+        y: np.array([dy])
+    Returns:
+        h_min(y): real function value
+    """
+    x_min = -1/self.rho*self.A.T.dot(y)
+    return self.F(x_min, y)
+
   # def grad_f(self, x):
-  #   return self.l * x
+  #   return self.rho * x
 
   # def grad_g(self, y):
   #   return grad_y
@@ -112,15 +156,13 @@ class LogisticRegression:
 
   def proj_y(self, y):
     ny = y.copy()
-    ny *= self.y
-    ny = np.clip(ny, -1+1e-15, -1e-15)
-    ny *= self.y
+    ny = np.clip(ny, 1e-15, -1e-15)
     return ny
 
   def loss(self, x, y):
     if self.xopt is None or self.yopt is None:
         from sklearn.linear_model import LogisticRegression
-        log_reg = LogisticRegression(penalty='l2', C=1/(self.n * self.l), multi_class='ovr', fit_intercept=False)
+        log_reg = LogisticRegression(penalty='l2', C=1/(self.n * self.rho), multi_class='ovr', fit_intercept=False)
         log_reg.fit(self.A * self.n, self.y)
         self.xopt = log_reg.coef_[0]
 

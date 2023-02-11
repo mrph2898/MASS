@@ -53,7 +53,7 @@ def metrics(problem, x, y):
 
     if problem.primal_func is not None and problem.dual_func is not None:
         p_func = problem.primal_func(x, y=y)
-        d_func = problem.dual_func(y, x=x, func_lb=p_func)
+        d_func = problem.dual_func(y, x=x)
         gap = p_func - d_func
         try:
             assert gap >= 0 or np.isclose(gap, 0.)
@@ -196,6 +196,54 @@ def main(problem, iteration,
             "x_hist": x,
             "y_hist": y,
             "iters_spent": smm_cls.iter_count
+        }
+    
+    if 'foam' in params:
+        foam_cls = copt.FOAM(problem=problem, x0=x0.copy(), y0=y0.copy(), 
+                       eps=eps, stopping_criteria='loss',
+                       params=params['foam']
+                      )
+    
+        loss, x, y = foam_cls(max_iter=iteration,
+                               verbose=verbose)
+        # loss, x, y = opt.altgd(problem=problem, x0=x0.copy(), y0=y0.copy(), 
+        #                        max_iter=iteration, lr=params['altgd'], verbose=verbose)
+        all_methods["FOAM"] = {
+            "class": foam_cls,
+            "marker": '--',
+            "loss_hist": loss,
+            "x_hist": x,
+            "y_hist": y,
+            "iters_spent": foam_cls.iter_count
+        }
+        
+    if "acceg" in params:
+        _params = copt.FOAM._get_foam_params(problem)
+        _alpha = _params["alpha"]
+        _theta = _params["theta"]
+        _mu_y = problem.mu_y
+        
+        _inner_iter = int(max(1/_alpha, _alpha/(_theta*_mu_y))*np.log(1/eps))
+        inner_optimiser = copt.FOAM
+
+        acceg_cls = copt.AccEG(problem,
+                          inner_optimiser=inner_optimiser,
+                          inner_max_iter=_inner_iter,
+                          x0=x0.copy(), 
+                          y0=y0.copy(),
+                          eps=eps,
+                          stopping_criteria="loss",
+                          params=params["acceg"]
+                         )
+        loss, x, y = acceg_cls(max_iter=iteration,
+                               verbose=verbose)
+        all_methods["AccEG"] = {
+            "class": acceg_cls,
+            "marker": '--',
+            "loss_hist": loss,
+            "x_hist": x,
+            "y_hist": y,
+            "iters_spent": acceg_cls.iter_count
         }
         
     if 'eg' in params:

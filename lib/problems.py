@@ -54,7 +54,8 @@ def get_A_fixed(lambda_min, lambda_max, n):
 
 
 class BaseSaddle(object):
-    def __init__(self, A:np.ndarray):
+    def __init__(self, A:np.ndarray, 
+                 proj_x=None, proj_y=None):
         self.xopt = None
         self.yopt = None
         self.xrange = None
@@ -67,7 +68,7 @@ class BaseSaddle(object):
         self.mu_y = None
         self.L_y = None
         
-        self.A = None
+        self.A = A
         self.mu_xy = None
         self.mu_yx = None
         self.L_xy = None
@@ -76,6 +77,11 @@ class BaseSaddle(object):
         self.grad_g = grad(self.g)
         self.dFdx = grad(self.F)
         self.dFdy = grad(self.F, 1)
+        self._proj_x = proj_x
+        self._proj_y = proj_y
+        self.proj_x = lambda x: x if proj_x is None else proj_x(x)
+        self.proj_y = lambda x: x if proj_y is None else proj_y(x)
+        
 
     def grad(self, x, y):
         derivs = np.array([self.dFdx(x, y), self.dFdy(x, y)])
@@ -406,7 +412,7 @@ class BilinearQuadraticSaddle:
   
         return self.F(x, y_max)
 
-    def dual_func(self, y, x=None, func_lb=None):
+    def dual_func(self, y, x=None):
         """
         Computes the function value
         g_min(y) = \min_x F(x, y)
@@ -426,6 +432,14 @@ class BilinearQuadraticSaddle:
         except scipy.linalg.LinAlgError:
             x_min = scipy.linalg.lstsq(matrix, vector, check_finite=True)[0]
         return self.F(x_min, y)
+    
+    def prox_f(self, v, scale=1.):
+        xopt = LA.solve(scale*self.B + np.eye(self.B.shape[0]), v - scale*self.b)
+        return xopt
+        
+    def prox_g(self, v, scale=1.):
+        yopt = LA.solve(scale*self.C + np.eye(self.C.shape[0]), v - scale*self.c)
+        return yopt
 
     def loss(self, x, y):
         if self.mu_x != 0.0 and self.mu_y != 0.0:
