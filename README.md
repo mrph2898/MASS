@@ -1,5 +1,5 @@
 # MinimaxAcceleratedSolverS (MASS)
-This repositiory is constisting of several experiments with accelerated algorithms for minimax problems solving.
+This repository consists of several experiments with accelerated algorithms for minimax problem-solving.
 
 **Accelerated Promary-Dual Gradient (APDG)**:  https://arxiv.org/pdf/2112.15199.pdf
 
