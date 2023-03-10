@@ -679,9 +679,7 @@ class AccEG(BaseSaddleOpt):
         
         _loss, _, _ = inner_optimiser(max_iter=self.inner_max_iter,
                                          verbose=0)
-        # plt.plot(_loss)
-        # plt.show()
-        # print(inner_optimiser.iter_count)
+
         self.x_f = inner_optimiser.x
         self.y = inner_optimiser.y
         

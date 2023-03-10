@@ -239,7 +239,7 @@ def main(problem, iteration,
                                verbose=verbose)
         all_methods["AccEG"] = {
             "class": acceg_cls,
-            "marker": '--',
+            "marker": '-^',
             "loss_hist": loss,
             "x_hist": x,
             "y_hist": y,
