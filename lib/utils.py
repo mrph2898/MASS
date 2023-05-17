@@ -142,7 +142,7 @@ def main(problem, iteration,
     
     # TODO: Drop histories from result dict (because class has already it)
     all_methods = {}
-    
+
     if 'apdg' in params:
         # loss, x, y = opt.APDG(problem=problem, x0=x0.copy(), y0=y0.copy(), 
         #                       max_iter=iteration, params=params['apdg'], verbose=verbose)
@@ -153,11 +153,12 @@ def main(problem, iteration,
                               verbose=verbose)
         all_methods["APDG"] = {
             "class": apdg_cls,
-            "marker": 'g--',
+            "marker": 'g-1',
             "loss_hist": loss,
             "x_hist": x,
             "y_hist": y,
-            "iters_spent": apdg_cls.iter_count
+            "iters_spent": apdg_cls.iter_count,
+            "total_time": apdg_cls.time
         }
         
     if 'altgd' in params:
@@ -172,11 +173,12 @@ def main(problem, iteration,
         #                        max_iter=iteration, lr=params['altgd'], verbose=verbose)
         all_methods["AltGD"] = {
             "class": altgd_cls,
-            "marker": '--',
+            "marker": '--p',
             "loss_hist": loss,
             "x_hist": x,
             "y_hist": y,
-            "iters_spent": apdg_cls.iter_count
+            "iters_spent": altgd_cls.iter_count,
+            "total_time": altgd_cls.time
         }
         
     if 'smm' in params:
@@ -191,11 +193,12 @@ def main(problem, iteration,
         #                        max_iter=iteration, lr=params['altgd'], verbose=verbose)
         all_methods["SeparateMiniMax"] = {
             "class": smm_cls,
-            "marker": '--',
+            "marker": '-v',
             "loss_hist": loss,
             "x_hist": x,
             "y_hist": y,
-            "iters_spent": smm_cls.iter_count
+            "iters_spent": smm_cls.iter_count,
+            "total_time": smm_cls.time
         }
     
     if 'foam' in params:
@@ -210,11 +213,12 @@ def main(problem, iteration,
         #                        max_iter=iteration, lr=params['altgd'], verbose=verbose)
         all_methods["FOAM"] = {
             "class": foam_cls,
-            "marker": '--',
+            "marker": '-X',
             "loss_hist": loss,
             "x_hist": x,
             "y_hist": y,
-            "iters_spent": foam_cls.iter_count
+            "iters_spent": foam_cls.iter_count,
+            "total_time": foam_cls.time
         }
         
     if "acceg" in params:
@@ -243,7 +247,38 @@ def main(problem, iteration,
             "loss_hist": loss,
             "x_hist": x,
             "y_hist": y,
-            "iters_spent": acceg_cls.iter_count
+            "iters_spent": acceg_cls.iter_count,
+            "total_time": acceg_cls.time
+        }
+        
+    if "accel-eg" in params:
+        _params = copt.FOAM._get_foam_params(problem)
+        _alpha = _params["alpha"]
+        _theta = _params["theta"]
+        _mu_y = problem.mu_y
+        
+        _inner_iter = int(max(1/_alpha, _alpha/(_theta*_mu_y))*np.log(1/eps))
+        inner_optimiser = copt.LPD
+
+        acc_eg_cls = copt.AcceleratedEG(problem,
+                          inner_optimiser=inner_optimiser,
+                          inner_max_iter=_inner_iter,
+                          x0=x0.copy(), 
+                          y0=y0.copy(),
+                          eps=eps,
+                          stopping_criteria="loss",
+                          params=params["accel-eg"]
+                         )
+        loss, x, y = acc_eg_cls(max_iter=iteration,
+                               verbose=verbose)
+        all_methods["AcceleratedEG"] = {
+            "class": acc_eg_cls,
+            "marker": '-^',
+            "loss_hist": loss,
+            "x_hist": x,
+            "y_hist": y,
+            "iters_spent": acc_eg_cls.iter_count,
+            "total_time": acc_eg_cls.time
         }
         
     if 'eg' in params:
@@ -262,7 +297,8 @@ def main(problem, iteration,
             "loss_hist": loss,
             "x_hist": x,
             "y_hist": y,
-            "iters_spent": apdg_cls.iter_count
+            "iters_spent": eg_cls.iter_count,
+            "total_time": eg_cls.time
         }
         
     if "omd" in params:
@@ -277,11 +313,12 @@ def main(problem, iteration,
         #                      max_iter=iteration, lr=params['omd'], verbose=verbose)
         all_methods["OMD"] = {
             "class": omd_cls,
-            "marker": 'c-*',
+            "marker": 'c--*',
             "loss_hist": loss,
             "x_hist": x,
             "y_hist": y,
-            "iters_spent": apdg_cls.iter_count
+            "iters_spent": omd_cls.iter_count,
+            "total_time": omd_cls.time
         }
         
     if 'AA' in params:
@@ -297,11 +334,12 @@ def main(problem, iteration,
             #                           max_iter=iteration, lr=params['AA'], k=k, verbose=verbose)
             all_methods["AltGDA-AM"] = {
                 "class": altgdaam_cls,
-                "marker": 'b->',
+                "marker": 'b-->',
                 "loss_hist": loss,
                 "x_hist": x,
                 "y_hist": y,
-                "iters_spent": apdg_cls.iter_count
+                "iters_spent": altgdaam_cls.iter_count,
+                "total_time": altgdaam_cls.time
             }
         except ValueError:
             print("AltGDA-AM couldn't be used in such parameters' settings")
@@ -318,11 +356,12 @@ def main(problem, iteration,
         #                        max_iter=iteration, lr=params['simgd'], verbose=verbose)  
         all_methods["SimGD"] = {
             "class": simgd_cls,
-            "marker": 'm-',
+            "marker": 'm--o',
             "loss_hist": loss,
             "x_hist": x,
             "y_hist": y,
-            "iters_spent": apdg_cls.iter_count
+            "iters_spent": simgd_cls.iter_count,
+            "total_time": simgd_cls.time
         }
         
     if 'avg' in params:
@@ -337,11 +376,12 @@ def main(problem, iteration,
         #                        max_iter=iteration, lr=params['avg'], verbose=verbose)  
         all_methods["AVG"] = {
             "class": avg_cls,
-            "marker": 'y-h',
+            "marker": 'y--h',
             "loss_hist": loss,
             "x_hist": x,
             "y_hist": y,
-            "iters_spent": apdg_cls.iter_count
+            "iters_spent": avg_cls.iter_count,
+            "total_time": avg_cls.time
         }
         
     if 'lpd' in params:
@@ -359,7 +399,8 @@ def main(problem, iteration,
             "loss_hist": loss,
             "x_hist": x,
             "y_hist": y,
-            "iters_spent": apdg_cls.iter_count
+            "iters_spent": lpd_cls.iter_count,
+            "total_time": lpd_cls.time
         }
         
     return all_methods

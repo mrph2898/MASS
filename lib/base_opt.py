@@ -63,10 +63,16 @@ class BaseSaddleOpt(object):
         self.x = self.proj_x(self.x)
         self.y = self.proj_y(self.y)
 
-        # self._name = None
         self.params = params
         
         self.eps = eps
+        
+        # Amount of atomic operations: 
+        # +, -, *, /, sqrt, **, dot = 1
+        # A.dot(x) = N, where A - N x m matrix
+        # A.dot(B) = N*M, where B - m x M matrix
+        self._step_complexity = None
+        
         if stopping_criteria == 'grad_rel':
             self.stopping_criteria = self.stopping_criteria_grad_relative
         elif stopping_criteria == 'grad_abs':
@@ -75,6 +81,8 @@ class BaseSaddleOpt(object):
             self.stopping_criteria = self.stopping_criteria_loss
         elif stopping_criteria == 'sliding':
             self.stopping_criteria = self.stopping_criteria_sliding
+        elif stopping_criteria == 'accel_sliding':
+            self.stopping_criteria = self.stopping_criteria_acceg_sliding
         elif stopping_criteria == None:
             self.stopping_criteria = self.stopping_criteria_none
         elif callable(stopping_criteria):
@@ -107,7 +115,9 @@ class BaseSaddleOpt(object):
         self.loss = [self.problem.loss(self.x, self.y)]
         self.all_metrics = {"gap": [],
                             "grad_norm": [],
-                            "func": []
+                            "func": [],
+                            "step_time": [],
+                            "step_complexity": []
                            }
         metrics, _ = ut.metrics(self.problem, self.x, self.y)
         for metric, val in metrics.items():
@@ -127,12 +137,17 @@ class BaseSaddleOpt(object):
             self._update_time()
             
             self.step()
+            self.all_metrics["step_time"].append((datetime.now() -
+                                                  self._absolute_time).total_seconds())
+            
+            self.all_metrics["step_complexity"].append(self._step_complexity)
             self.x = self.proj_x(self.x)
             self.y = self.proj_y(self.y)
             lo = self.problem.loss(self.x, self.y)
             metrics, _ = ut.metrics(self.problem, self.x, self.y)
             for metric, val in metrics.items():
                 self.all_metrics[metric].append(val)
+            
             self.loss.append(lo)  
             self.x_hist.append(self.x)
             self.y_hist.append(self.y)            
@@ -151,10 +166,14 @@ class BaseSaddleOpt(object):
         raise NotImplementedError('step() not implemented!')
 
     def stopping_criteria_grad_relative(self):
-        return self.grad.dot(self.grad) <= self.eps * self.grad_norm_0 ** 2
+        eta_x, eta_y = self.problem._optimiser_params["eta_x"], self.problem._optimiser_params["eta_y"]
+        Fx, Fy = self.problem.grad(self.x, self.y)
+        return (eta_x*LA.norm(Fx)**2 + eta_y*LA.norm(Fy)**2) <= self.eps * self.grad_norm_0 ** 2
 
     def stopping_criteria_grad_absolute(self):
-        return self.grad.dot(self.grad) <= self.eps
+        eta_x, eta_y = self.problem._optimiser_params["eta_x"], self.problem._optimiser_params["eta_y"]
+        Fx, Fy = self.problem.grad(self.x, self.y)
+        return (eta_x*LA.norm(Fx)**2 + eta_y*LA.norm(Fy)**2) <= self.eps
     
     def stopping_criteria_loss(self):
         return self.problem.loss(self.x, self.y) <= self.eps
@@ -165,9 +184,17 @@ class BaseSaddleOpt(object):
         _A = self.problem.A
         _C = self.problem.C
         f_grad_x, _ = self.problem.fg_grads(self.x, self.y)
-        x_opt = LA.solve(3/4*_A.T.dot(LA.inv(_C)).dot(_A) + 1/self.problem._optimiser_params["theta"]*np.eye(self.x.shape[0]),
+        x_opt = LA.solve(3/4*_A.T.dot(LA.inv(_C)).dot(_A) + 
+                         1/self.problem._optimiser_params["theta"]*np.eye(self.x.shape[0]),
                          self.problem._optimiser_params["right_part"])
         return np.sum(LA.norm(f_grad_x + 3/4 * _A.T.dot(LA.inv(_C)).dot(_A).dot(self.x))**2) <= 0.5*self.problem.L_x**2*np.sum((self.x_hist[0] - x_opt)**2)
+    
+    def stopping_criteria_acceg_sliding(self):
+        eta_x, eta_y = self.problem._optimiser_params["eta_x"], self.problem._optimiser_params["eta_y"]
+        f_grad_x, g_grad_y = self.problem.fg_grads(self.x, self.y)
+        Fx, Fy = self.problem.grad(self.x, self.y)
+        return (eta_x*LA.norm(Fx)**2 + eta_y*LA.norm(Fy)**2) <= 1/3*(1/eta_x* LA.norm(self.x - self.x_hist[0])**2 + 
+                                                                     1/eta_y* LA.norm(self.y - self.y_hist[0])**2)
 
     def stopping_criteria_none(self):
         return False

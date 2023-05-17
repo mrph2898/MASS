@@ -70,6 +70,16 @@ class LogisticRegression:
     self._proj_x = None
     self._proj_y = None
     
+    N, M = self.A.shape
+    self.gradx_complexity = 1+M
+    self.grady_complexity = 1+1+3+1+1+3+1+N
+    self.grad_f_complexity = 1
+    self.grad_g_complexity = 1+1+3+1+1+3+1
+    # self.prox_f_complexity = (1+K)**3 + 2
+    # self.prox_g_complexity = (1+L)**3 + 2
+    # self.prox_f_complexity = K + 2
+    # self.prox_g_complexity = L + 2
+    
 
   @classmethod
   def with_parameters(cls, nx, ny, L_x_mu_x, L_xy, mu_xy, L_y=None, mu_y=None):
@@ -153,6 +163,12 @@ class LogisticRegression:
     grad_y = dAdy - self.grad_g(y)
 
     return (grad_x, grad_y)
+
+
+    def prox_f(self, v, scale=1.):
+        xopt = self._inv_BI.dot(v - self._prox_scale*self.b)
+        return xopt
+    
 
   def proj_y(self, y):
     ny = y.copy()

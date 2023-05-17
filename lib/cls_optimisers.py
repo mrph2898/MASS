@@ -17,6 +17,8 @@ class SimGD(BaseSaddleOpt):
                  params: dict
                 ):
         super().__init__(problem, x0, y0, eps, stopping_criteria, params)
+        
+        self._step_complexity = 2+2+problem.gradx_complexity+problem.grady_complexity
         if params is None:
             self.params = self._get_simgd_params(problem)
         
@@ -43,6 +45,8 @@ class AltGD(BaseSaddleOpt):
                  params: dict
                 ):
         super().__init__(problem, x0, y0, eps, stopping_criteria, params)
+        
+        self._step_complexity = 2+2+problem.gradx_complexity+problem.grady_complexity
         if params is None:
             self.params = self._get_altgd_params(problem)
         
@@ -71,6 +75,8 @@ class Avg(BaseSaddleOpt):
                 ):
         super().__init__(problem, x0, y0, eps, stopping_criteria, params)
         self.xavg, self.yavg = self.x.copy(), self.y.copy()
+        
+        self._step_complexity = 5+5+7+7
         if params is None:
             self.params = self._get_avg_params(problem)
         
@@ -99,6 +105,8 @@ class EG(BaseSaddleOpt):
                  params: dict
                 ):
         super().__init__(problem, x0, y0, eps, stopping_criteria, params)
+        
+        self._step_complexity = 2+2+2+2+(problem.gradx_complexity+problem.grady_complexity)*2
         if params is None:
             self.params = self._get_eg_params(problem)
         
@@ -130,6 +138,8 @@ class OMD(BaseSaddleOpt):
         super().__init__(problem, x0, y0, eps, stopping_criteria, params)
         x_l, y_l = 0.5*x0, 0.5*y0
         self.g_xl, self.g_yl = self.problem.grad(x_l,y_l)
+        
+        self._step_complexity = 5+5+problem.gradx_complexity+problem.grady_complexity
         if params is None:
             self.params = self._get_omd_params(problem)
         
@@ -157,6 +167,9 @@ class AltGDAAM(BaseSaddleOpt):
                 ):
         super().__init__(problem, x0, y0, eps, stopping_criteria, params)
         self.fp = np.vstack((self.x, self.y))
+        
+        # TODO: Count AA complexity
+        self._step_complexity = None
         if params is None:
             self.params = self._get_altgdaam_params(problem)
         self.aa = AA.numpyAA(2, self.params['k'], 
@@ -199,6 +212,10 @@ class APDG(BaseSaddleOpt):
         self.x_f, self.y_f = x0.copy(), y0.copy()
         self.y_prev = y0.copy() 
         self.A = problem.A
+        
+        N, M = self.A.shape
+        self._step_complexity = (3+4+4+(7+(N+1)*M+2+1+M)+(7+(M+1)*N+3+N)+
+                                 3+3+problem.grad_f_complexity+problem.grad_g_complexity)
         if params is None:
             self.params = self._get_apdg_params(problem)
         
@@ -314,6 +331,9 @@ class LPD(BaseSaddleOpt):
         self.grad_bx, self.grad_by = self._grad_f(self.bx), self._grad_h(self.by)
         self.grad_bx_prev, self.grad_by_prev = self.grad_bx, self.grad_by
         
+        N, M = problem.A.shape
+        self._step_complexity = (3+3+3+3+(2+M+1+3)+(2+N+1+3)+3+3+
+                                 problem.grad_f_complexity+2+problem.grad_g_complexity+2)
         if params is None:
             self.params = self._get_lpd_params(problem)
         
@@ -432,6 +452,11 @@ class SepMiniMax(BaseSaddleOpt):
         https://arxiv.org/pdf/2202.04640.pdf
         """
         super().__init__(problem, x0, y0, eps, stopping_criteria, params)
+        
+        N,M = problem.A.shape
+        self._step_complexity = (M+N+3+3+4+4+6+6+M+N+3+3+12+12+7+7+
+                                 (problem.grad_f_complexity+problem.grad_g_complexity)*2
+                                )
         if params is None:
             self.params = self._get_smm_params(problem)
         self.x_f = x0.copy()
@@ -500,6 +525,15 @@ class FOAM(BaseSaddleOpt):
         self.z_f = x0.copy()
         self.z = x0.copy()
         self.A = problem.A
+        
+        N, M = self.A.shape
+        self._while_step_complexity = (3*N+3*M+1+(3+N)+(3+M)+(7+5)+(7+5)+(6+5)+(6+5)+(9+5+1)+(9+5+1)+
+                                      problem.prox_f_complexity+problem.prox_g_complexity)
+        self._zero_step_complexity = (4+4+3+(3+5+1)+(3+5+1)+(6+5+1)+(6+5+1)+3+4+10+9+3+
+                                      problem.prox_f_complexity+problem.prox_g_complexity+
+                                      problem.grad_f_complexity+problem.grad_g_complexity
+                                     )
+        self._step_complexity = self._zero_step_complexity
         if params is None:
             self.params = self._get_foam_params(problem)
         
@@ -546,6 +580,7 @@ class FOAM(BaseSaddleOpt):
         return 2/(t + 3)
         
     def step(self):
+        self._step_complexity = self._zero_step_complexity
         _alpha = self.params['alpha']
         _theta = self.params["theta"] 
         _eta_z = self.params["eta_z"] 
@@ -575,6 +610,7 @@ class FOAM(BaseSaddleOpt):
             1/_gamma_y*LA.norm(y_k - _y_m1)**2
         
         ):
+            self._step_complexity += self._while_step_complexity
             x_k_half = x_k + self.beta(t)*(x_k_0 - x_k) - _gamma_x*_lambda*(self.a_x(x_k, y_k, z_g) + b_x_k)  
             y_k_half = y_k + self.beta(t)*(y_k_0 - y_k) - _gamma_y*_lambda*(self.a_y(x_k, y_k, y_g) + b_y_k)  
             x_k_next = self.problem.prox_f(x_k + self.beta(t)*(x_k_0 - x_k) -
@@ -605,9 +641,10 @@ class FOAM(BaseSaddleOpt):
         self.y = (self.y + _eta_y*self.problem.mu_y**-1 * (self.y_f - self.y) - 
                   _eta_y*(w_f + self.problem.mu_y * self.y_f))
 
-        self.x = -self.problem.mu_x**-1 * self.z
-        
+        # x update only for saving the current x for metrics
+        self.x = -self.problem.mu_x**-1 * self.z   
         self.x = self.proj_x(self.x)
+        
         self.y = self.proj_y(self.y)
         
 
@@ -623,6 +660,7 @@ class AccEG(BaseSaddleOpt):
                  params: dict
                 ):
         super().__init__(problem, x0, y0, eps, stopping_criteria, params)
+        
         if params is None:
             self.params = self._get_acceg_params(problem)
         self.x_f = x0.copy()
@@ -692,3 +730,105 @@ class AccEG(BaseSaddleOpt):
                   self.params['eta']*self.params['alpha']*(self.x_f - self.x) - 
                   self.params['eta']*gx
                  ) 
+        
+        
+class AcceleratedEG(BaseSaddleOpt):
+    def __init__(self,
+                 problem: BaseSaddle,
+                 inner_optimiser: BaseSaddleOpt,
+                 inner_max_iter: int,
+                 x0: np.ndarray, 
+                 y0: np.ndarray,
+                 eps: float,
+                 stopping_criteria: Optional[str],
+                 params: dict
+                ):
+        super().__init__(problem, x0, y0, eps, stopping_criteria, params)
+        
+        N,M = problem.A.shape
+        self._zero_step_complexity = (4+4+8+8+2+(3+N)+(3+M)+5+5+(2+M)+(2+N)+3+3+
+                                      problem.grad_f_complexity+problem.grad_g_complexity)
+        self._step_complexity = self._zero_step_complexity
+        if params is None:
+            self.params = self._get_acceg_params(problem)
+        self.x_f = x0.copy()
+        self.y_f = y0.copy()
+        self.inner_opt = inner_optimiser
+        self.inner_max_iter = inner_max_iter
+        
+ 
+    @staticmethod
+    def _get_acceg_params(problem: BaseSaddle):
+        _mu = min(problem.mu_x, problem.mu_y)
+        # L_p = max(problem.L_x, problem.L_y)
+        if problem.L_x/problem.mu_x > problem.L_y/problem.mu_y:
+            alpha = min(1, (problem.mu_x / problem.L_x)**.5)
+            eta_x = min((3*problem.mu_x)**-1, (3*alpha*problem.L_x)**-1)
+            eta_y = problem.mu_x/problem.mu_y * eta_x
+        else:
+            alpha = min(1, (problem.mu_y / problem.L_y)**.5)
+            eta_y = min((3*problem.mu_y)**-1, (3*alpha*problem.L_y)**-1)
+            eta_x = problem.mu_y/problem.mu_x * eta_y
+
+        return {"eta_x": eta_x,
+                "eta_y": eta_y,
+                "alpha": alpha
+               }
+    
+    
+    def step(self):
+        self._step_complexity = self._zero_step_complexity
+        x_g = self.params["alpha"]*self.x + (1 - self.params["alpha"])*self.x_f
+        y_g = self.params["alpha"]*self.y + (1 - self.params["alpha"])*self.y_f
+        
+        subproblem = BaseSaddle(A=self.problem.A)
+        # min max f(x) + <y, Ax> - g(y)
+        grad_f, grad_g = self.problem.fg_grads(x_g, y_g)
+        subproblem.f = lambda x: self.problem.f(x_g) + grad_f@(x - x_g) + 1/2/self.params["eta_x"] * (x - self.x).T@(x - self.x) 
+        subproblem.g = lambda y: self.problem.g(y_g) + grad_g@(y - y_g) + 1/2/self.params["eta_y"] * (y - self.y).T@(y - self.y) 
+        subproblem.mu_x = subproblem.L_x = (self.params["eta_x"])**-1
+        subproblem.mu_y = subproblem.L_y = (self.params["eta_y"])**-1
+        subproblem._optimiser_params = self.params
+        subproblem.mu_xy = self.problem.mu_xy 
+        subproblem.mu_yx = self.problem.mu_yx 
+        subproblem.L_xy = self.problem.L_xy
+    
+        u_opt = LA.solve(np.block([[np.eye(self.x.shape[0]), self.params["eta_x"]*subproblem.A.T],
+                                  [-self.params["eta_y"]*subproblem.A, np.eye(self.y.shape[0])]]), 
+                         np.hstack([self.x - self.params["eta_x"]*grad_f,
+                                    self.y - self.params["eta_y"]*grad_g
+                                   ])
+                        )
+        subproblem.xopt, subproblem.yopt = u_opt[: self.x.shape[0]], u_opt[self.x.shape[0]: ]
+        subproblem.primal_func = lambda x, y: subproblem.F(self.x, self.y - self.params["eta_y"]*(grad_g - subproblem.A@x))
+        subproblem.dual_func = lambda y, x: subproblem.F(self.x - self.params["eta_x"]*(grad_f + subproblem.A.T@y), y)
+        subproblem.prox_f = lambda v, scale: (self.x - self.params["eta_x"]*(grad_f - v))/(1 + self.params["eta_x"])
+        subproblem.prox_g = lambda v, scale: (self.y - self.params["eta_y"]*(grad_g - v))/(1 + self.params["eta_y"])
+        subproblem.grad_f = grad(subproblem.f)
+        subproblem.grad_g = grad(subproblem.g)
+        N, M = self.problem.A.shape
+        subproblem.gradx_complexity = 1+1+2+M
+        subproblem.grady_complexity = 1+1+2+N
+        subproblem.grad_f_complexity = 1+1+2
+        subproblem.grad_g_complexity = 1+1+2
+        subproblem.prox_f_complexity = 1+1+1+1+1
+        subproblem.prox_g_complexity = 1+1+1+1+1
+        
+        inner_optimiser = self.inner_opt(problem=subproblem, x0=self.x,
+                                         y0=self.y, eps=self.eps,
+                                         stopping_criteria='accel_sliding',
+                                         params=None
+                                        )
+        
+        _loss, _, _ = inner_optimiser(max_iter=self.inner_max_iter,
+                                      verbose=0)
+
+        self._step_complexity += sum(inner_optimiser.all_metrics["step_complexity"])
+        _x_next = self.x - self.params['eta_x']*(grad_f + self.problem.A.T@inner_optimiser.y)
+        _y_next = self.y - self.params['eta_y']*(grad_g - self.problem.A@inner_optimiser.x)
+        
+        self.x_f = x_g + self.params["alpha"]*(inner_optimiser.x - self.x)
+        self.y_f = y_g + self.params["alpha"]*(inner_optimiser.y - self.y)
+        
+        self.x = _x_next
+        self.y = _y_next

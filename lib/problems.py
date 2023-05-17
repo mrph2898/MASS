@@ -84,12 +84,12 @@ class BaseSaddle(object):
         
 
     def grad(self, x, y):
-        derivs = np.array([self.dFdx(x, y), self.dFdy(x, y)])
-        return derivs[0], derivs[1]
+        # derivs = np.array([self.dFdx(x, y), self.dFdy(x, y)])
+        return self.dFdx(x, y), self.dFdy(x, y)
     
     def fg_grads(self, x, y):
-        derivs = np.array([self.grad_f(x), self.grad_g(y)])
-        return derivs[0], derivs[1]
+        # derivs = np.array([self.grad_f(x), self.grad_g(y)])
+        return self.grad_f(x), self.grad_g(y)
     
     def loss(self, x, y):
         return np.sqrt(LA.norm(x-self.xopt)**2 + LA.norm(y-self.yopt)**2)
@@ -130,6 +130,7 @@ class GeneralSaddle(BaseSaddle):
         self.constraint = False   
         self.grad_f = grad(self.f)
         self.grad_g = grad(self.g)
+        N, M = self.A.shape
         
         self.dFdx = grad(F)
         self.dFdy = grad(F, 1)   
@@ -262,6 +263,30 @@ class BilinearQuadraticSaddle:
         self._proj_y = proj_y
         self.proj_x = lambda x: x if proj_x is None else proj_x(x)
         self.proj_y = lambda x: x if proj_y is None else proj_y(x)
+        K, _ = self.B.shape
+        N, M = self.A.shape
+        L, _ = self.C.shape
+        self.gradx_complexity = 1+1+K+M
+        self.grady_complexity = 1+1+L+N
+        self.grad_f_complexity = 1+1+K
+        self.grad_g_complexity = 1+1+L
+        # self.prox_f_complexity = (1+K)**3 + 2
+        # self.prox_g_complexity = (1+L)**3 + 2
+        self.prox_f_complexity = K + 2
+        self.prox_g_complexity = L + 2
+        
+        self._prox_scale = 1.
+        self._inv_BI = LA.inv(self._prox_scale*self.B + np.eye(self.B.shape[0]))
+        self._inv_CI = LA.inv(self._prox_scale*self.C + np.eye(self.C.shape[0]))
+        
+        if self.xopt is None or self.yopt is None:
+            matrix = np.block([[self.B, self.A.T], [-self.A, self.C]])
+            vector = np.block([-self.b,-self.c])
+            try:
+                opt = scipy.linalg.solve(matrix, vector, check_finite=True, assume_a='gen')
+            except scipy.linalg.LinAlgError:
+                opt = scipy.linalg.lstsq(matrix, vector, check_finite=True)[0]
+            self.xopt, self.yopt = opt[:self.dx], opt[self.dx:]
         
 
     @classmethod
@@ -434,23 +459,15 @@ class BilinearQuadraticSaddle:
         return self.F(x_min, y)
     
     def prox_f(self, v, scale=1.):
-        xopt = LA.solve(scale*self.B + np.eye(self.B.shape[0]), v - scale*self.b)
+        xopt = self._inv_BI.dot(v - self._prox_scale*self.b)
         return xopt
         
     def prox_g(self, v, scale=1.):
-        yopt = LA.solve(scale*self.C + np.eye(self.C.shape[0]), v - scale*self.c)
+        yopt = self._inv_CI.dot(v - self._prox_scale*self.c)
         return yopt
 
     def loss(self, x, y):
         if self.mu_x != 0.0 and self.mu_y != 0.0:
-            if self.xopt is None or self.yopt is None:
-                matrix = np.block([[self.B, self.A.T], [-self.A, self.C]])
-                vector = np.block([-self.b,-self.c])
-                try:
-                    opt = scipy.linalg.solve(matrix, vector, check_finite=True, assume_a='gen')
-                except scipy.linalg.LinAlgError:
-                    opt = scipy.linalg.lstsq(matrix, vector, check_finite=True)[0]
-                self.xopt, self.yopt = opt[:self.dx], opt[self.dx:]
             distance_squared = LA.norm(np.block([self.xopt, self.yopt]) - np.block([x, y]))
         else:
             distance_squared = np.inf
