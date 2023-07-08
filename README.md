@@ -1,7 +1,7 @@
 # MinimaxAcceleratedSolverS (MASS)
 This repository consists of several experiments with accelerated algorithms for minimax problem-solving.
 
-**Accelerated Promary-Dual Gradient (APDG)**:  https://arxiv.org/pdf/2112.15199.pdf
+**Accelerated Primary-Dual Gradient (APDG)**:  https://arxiv.org/pdf/2112.15199.pdf
 
 **Lifted Primal Dual (LPD)**: https://arxiv.org/pdf/2201.07427.pdf
 
