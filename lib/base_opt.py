@@ -117,7 +117,9 @@ class BaseSaddleOpt(object):
                             "grad_norm": [],
                             "func": [],
                             "step_time": [],
-                            "step_complexity": []
+                            "step_complexity": [],
+                            "grad_p_complexity": [],
+                            "grad_q_complexity": [],
                            }
         metrics, _ = ut.metrics(self.problem, self.x, self.y)
         for metric, val in metrics.items():
@@ -129,7 +131,8 @@ class BaseSaddleOpt(object):
             bar = tqdm(bar, desc=self.__class__.__name__)
             
         self._absolute_time = datetime.now()
-        
+        if self._prestep_complexity is not None:
+            self.all_metrics["step_complexity"].append(self._prestep_complexity)
         for iter_count in bar:
             self.iter_count = iter_count
             if self.time > max_time:
@@ -141,6 +144,8 @@ class BaseSaddleOpt(object):
                                                   self._absolute_time).total_seconds())
             
             self.all_metrics["step_complexity"].append(self._step_complexity)
+            self.all_metrics["grad_p_complexity"].append(self.grad_p_calls)
+            self.all_metrics["grad_q_complexity"].append(self.grad_q_calls)
             self.x = self.proj_x(self.x)
             self.y = self.proj_y(self.y)
             lo = self.problem.loss(self.x, self.y)
@@ -187,14 +192,18 @@ class BaseSaddleOpt(object):
         x_opt = LA.solve(3/4*_A.T.dot(LA.inv(_C)).dot(_A) + 
                          1/self.problem._optimiser_params["theta"]*np.eye(self.x.shape[0]),
                          self.problem._optimiser_params["right_part"])
-        return np.sum(LA.norm(f_grad_x + 3/4 * _A.T.dot(LA.inv(_C)).dot(_A).dot(self.x))**2) <= 0.5*self.problem.L_x**2*np.sum((self.x_hist[0] - x_opt)**2)
+        return (np.sum(LA.norm(f_grad_x + 3/4 * _A.T.dot(LA.inv(_C)).dot(_A).dot(self.x))**2) <=
+                0.5*self.problem.L_x**2*np.sum((self.x_hist[0] - x_opt)**2))
     
     def stopping_criteria_acceg_sliding(self):
         eta_x, eta_y = self.problem._optimiser_params["eta_x"], self.problem._optimiser_params["eta_y"]
-        f_grad_x, g_grad_y = self.problem.fg_grads(self.x, self.y)
+        # f_grad_x, g_grad_y = self.problem.fg_grads(self.x, self.y) 
         Fx, Fy = self.problem.grad(self.x, self.y)
-        return (eta_x*LA.norm(Fx)**2 + eta_y*LA.norm(Fy)**2) <= 1/3*(1/eta_x* LA.norm(self.x - self.x_hist[0])**2 + 
-                                                                     1/eta_y* LA.norm(self.y - self.y_hist[0])**2)
+        return ((eta_x*LA.norm(Fx)**2 + eta_y*LA.norm(Fy)**2) <=
+                1/6*(1/eta_x* LA.norm(self.x - self.x_hist[0])**2 +
+                     1/eta_y* LA.norm(self.y - self.y_hist[0])**2)
+               )
+    
 
     def stopping_criteria_none(self):
         return False

@@ -280,6 +280,26 @@ def main(problem, iteration,
             "iters_spent": acc_eg_cls.iter_count,
             "total_time": acc_eg_cls.time
         }
+
+    if "twice-aceg" in params:
+        twice_acc_eg_cls = copt.TwiceAcceleratedEG(problem,
+                                             x0=x0.copy(),
+                                             y0=y0.copy(),
+                                             eps=eps,
+                                             stopping_criteria="loss",
+                                             params=params["twice-aceg"]
+                                        )
+        loss, x, y = twice_acc_eg_cls(max_iter=iteration,
+                                verbose=verbose)
+        all_methods["TwiceAcceleratedEG"] = {
+            "class": twice_acc_eg_cls,
+            "marker": '-^',
+            "loss_hist": loss,
+            "x_hist": x,
+            "y_hist": y,
+            "iters_spent": twice_acc_eg_cls.iter_count,
+            "total_time": twice_acc_eg_cls.time
+        }
         
     if 'eg' in params:
         eg_cls = copt.EG(problem=problem, x0=x0.copy(), y0=y0.copy(), 

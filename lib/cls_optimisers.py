@@ -2,6 +2,7 @@ from typing import Optional, Union, Callable
 import numpy as np
 import numpy.linalg as LA
 from autograd import grad
+import autograd.numpy as anp
 import lib.anderson_acceleration as AA
 from .base_opt import BaseSaddleOpt
 from .problems import BaseSaddle
@@ -19,8 +20,11 @@ class SimGD(BaseSaddleOpt):
         super().__init__(problem, x0, y0, eps, stopping_criteria, params)
         
         self._step_complexity = 2+2+problem.gradx_complexity+problem.grady_complexity
+        self._prestep_complexity = None
         if params is None:
             self.params = self._get_simgd_params(problem)
+        self.grad_p_calls = 0
+        self.grad_q_calls = 0
         
  
     @staticmethod
@@ -31,6 +35,9 @@ class SimGD(BaseSaddleOpt):
     
     def step(self):
         gx, gy = self.problem.grad(self.x, self.y)
+        self.grad_p_calls += 1
+        self.grad_q_calls += 1
+        
         self.x = self.x - self.params['lr'] * gx
         self.y = self.y + self.params['lr'] * gy
     
@@ -47,8 +54,12 @@ class AltGD(BaseSaddleOpt):
         super().__init__(problem, x0, y0, eps, stopping_criteria, params)
         
         self._step_complexity = 2+2+problem.gradx_complexity+problem.grady_complexity
+        self._prestep_complexity = None
         if params is None:
             self.params = self._get_altgd_params(problem)
+            
+        self.grad_p_calls = 0
+        self.grad_q_calls = 0
         
  
     @staticmethod
@@ -59,9 +70,14 @@ class AltGD(BaseSaddleOpt):
         
     def step(self):
         g_x, _ = self.problem.grad(self.x, self.y)
+        self.grad_p_calls += 1
+        
         self.x = self.x - self.params['lr'] * g_x
         _, g_y = self.problem.grad(self.x, self.y)
+        self.grad_q_calls += 1
+        
         self.y = self.y + self.params['lr'] * g_y
+        
     
 
 class Avg(BaseSaddleOpt):
@@ -77,8 +93,11 @@ class Avg(BaseSaddleOpt):
         self.xavg, self.yavg = self.x.copy(), self.y.copy()
         
         self._step_complexity = 5+5+7+7
+        self._prestep_complexity = None
         if params is None:
             self.params = self._get_avg_params(problem)
+        self.grad_p_calls = 0
+        self.grad_q_calls = 0 
         
  
     @staticmethod
@@ -107,8 +126,11 @@ class EG(BaseSaddleOpt):
         super().__init__(problem, x0, y0, eps, stopping_criteria, params)
         
         self._step_complexity = 2+2+2+2+(problem.gradx_complexity+problem.grady_complexity)*2
+        self._prestep_complexity = None
         if params is None:
             self.params = self._get_eg_params(problem)
+        self.grad_p_calls = 0
+        self.grad_q_calls = 0
         
  
     @staticmethod
@@ -119,9 +141,14 @@ class EG(BaseSaddleOpt):
 
     def step(self):
         gx, gy = self.problem.grad(self.x, self.y)
+        self.grad_p_calls += 1
+        self.grad_q_calls += 1
+        
         x_ = self.x - self.params['lr'] * gx
         y_ = self.y + self.params['lr'] * gy
         gx, gy = self.problem.grad(x_, y_)
+        self.grad_p_calls += 1
+        self.grad_q_calls += 1
         self.x = self.x - self.params['lr'] * gx
         self.y = self.y + self.params['lr'] * gy
         
@@ -140,8 +167,11 @@ class OMD(BaseSaddleOpt):
         self.g_xl, self.g_yl = self.problem.grad(x_l,y_l)
         
         self._step_complexity = 5+5+problem.gradx_complexity+problem.grady_complexity
+        self._prestep_complexity = None
         if params is None:
             self.params = self._get_omd_params(problem)
+        self.grad_p_calls = 0
+        self.grad_q_calls = 0
         
  
     @staticmethod
@@ -151,6 +181,9 @@ class OMD(BaseSaddleOpt):
 
     def step(self):
         g_x, g_y = self.problem.grad(self.x,self.y)
+        self.grad_p_calls += 1
+        self.grad_q_calls += 1
+        
         self.x = self.x - 2 * self.params['lr'] * g_x + self.params['lr'] * self.g_xl
         self.y = self.y + 2 * self.params['lr'] * g_y - self.params['lr'] * self.g_yl
         self.g_xl, self.g_yl =  g_x, g_y
@@ -170,11 +203,14 @@ class AltGDAAM(BaseSaddleOpt):
         
         # TODO: Count AA complexity
         self._step_complexity = None
+        self._prestep_complexity = None
         if params is None:
             self.params = self._get_altgdaam_params(problem)
         self.aa = AA.numpyAA(2, self.params['k'], 
                              type2=self.params['type2'],
                              reg=self.params['reg'])
+        self.grad_p_calls = 0
+        self.grad_q_calls = 0
         
  
     @staticmethod
@@ -191,8 +227,12 @@ class AltGDAAM(BaseSaddleOpt):
     def step(self):
         fpprev = np.copy(self.fp)
         g_x, _ = self.problem.grad(self.x, self.y)
+        self.grad_p_calls += 1
+        
         x_ = (1 - self.params['gamma']) * self.x - self.params['lr'] * g_x
         _, g_y = self.problem.grad(x_, self.y)
+        self.grad_q_calls += 1
+        
         y_ = self.y + self.params['lr'] * g_y
         self.fp = np.vstack((x_, y_))
         self.fp = self.aa.apply(fpprev, self.fp)
@@ -216,8 +256,11 @@ class APDG(BaseSaddleOpt):
         N, M = self.A.shape
         self._step_complexity = (3+4+4+(7+(N+1)*M+2+1+M)+(7+(M+1)*N+3+N)+
                                  3+3+problem.grad_f_complexity+problem.grad_g_complexity)
+        self._prestep_complexity = None
         if params is None:
             self.params = self._get_apdg_params(problem)
+        self.grad_p_calls = 0
+        self.grad_q_calls = 0
         
         
     @staticmethod
@@ -291,6 +334,8 @@ class APDG(BaseSaddleOpt):
         y_g = self.proj_y(y_g)
 
         grad_x, grad_y = self.problem.fg_grads(x_g, y_g)
+        self.grad_p_calls += 1
+        self.grad_q_calls += 1
         self.x = (self.x + self.params['eta_x'] * self.params['alpha_x'] * (x_g - self.x) -
              self.params['eta_x'] * self.params['beta_x'] * (self.A.T.dot(self.A.dot(self.x) - grad_y)) - 
              self.params['eta_x'] * (grad_x + self.A.T.dot(y_m))
@@ -334,8 +379,11 @@ class LPD(BaseSaddleOpt):
         N, M = problem.A.shape
         self._step_complexity = (3+3+3+3+(2+M+1+3)+(2+N+1+3)+3+3+
                                  problem.grad_f_complexity+2+problem.grad_g_complexity+2)
+        self._prestep_complexity = None
         if params is None:
             self.params = self._get_lpd_params(problem)
+        self.grad_p_calls = 0
+        self.grad_q_calls = 0
         
         
     @staticmethod
@@ -407,8 +455,12 @@ class LPD(BaseSaddleOpt):
         tgrad_x_next = self.grad_bx + self.params['theta_xp']*(self.grad_bx - self.grad_bx_prev)
         tgrad_y_next = self.grad_by + self.params['theta_yp']*(self.grad_by - self.grad_by_prev)
 
-        x_next = (self.x - self.params['stepsize_x']*(self.problem.A.T.dot(ty_next) + tgrad_x_next))/(1.+self.params['stepsize_x']*self.problem.mu_x)
-        y_next = (self.y + self.params['stepsize_y']*(self.problem.A.dot(tx_next) - tgrad_y_next))/(1.+self.params['stepsize_y']*self.problem.mu_y)
+        x_next = (self.x - self.params['stepsize_x']*(
+            self.problem.A.T.dot(ty_next) + tgrad_x_next)
+                 ) / (1.+self.params['stepsize_x']*self.problem.mu_x)
+        y_next = (self.y + self.params['stepsize_y']*(
+            self.problem.A.dot(tx_next) - tgrad_y_next)
+                 ) / (1.+self.params['stepsize_y']*self.problem.mu_y)
 
         if k != 0 and (self.problem.mu_x == 0.0 or self.problem.mu_y == 0.0):
             self.params['stepsize_xp'] = 2.0/k
@@ -426,6 +478,8 @@ class LPD(BaseSaddleOpt):
 
         grad_bx_next = self._grad_f(bx_next)
         grad_by_next = self._grad_h(by_next)
+        self.grad_p_calls += 1
+        self.grad_q_calls += 1
 
     # update iterates
         self.x_prev, self.x = self.x, x_next
@@ -457,10 +511,13 @@ class SepMiniMax(BaseSaddleOpt):
         self._step_complexity = (M+N+3+3+4+4+6+6+M+N+3+3+12+12+7+7+
                                  (problem.grad_f_complexity+problem.grad_g_complexity)*2
                                 )
+        self._prestep_complexity = None
         if params is None:
             self.params = self._get_smm_params(problem)
         self.x_f = x0.copy()
         self.y_g = y0.copy()
+        self.grad_p_calls = 0
+        self.grad_q_calls = 0
         
  
     @staticmethod
@@ -476,6 +533,8 @@ class SepMiniMax(BaseSaddleOpt):
         
     def step(self):
         _df, _dg = self.problem.fg_grads(self.x_f, self.y_g)
+        self.grad_p_calls += 1
+        self.grad_q_calls += 1
         bilinear_dx, bilinear_dy = self.problem.A.T.dot(self.y), self.problem.A.dot(self.x)
         Phi_x = self.problem.mu_x*self.x + _df + bilinear_dx
         Phi_y = self.problem.mu_y*self.y + _dg - bilinear_dy
@@ -487,6 +546,8 @@ class SepMiniMax(BaseSaddleOpt):
         yg_half = (1 - 1/self.params["lambda"])*self.y_g + 1/self.params["lambda"]*self.y
         
         _df, _dg = self.problem.fg_grads(xf_half, yg_half)
+        self.grad_p_calls += 1
+        self.grad_q_calls += 1
         bilinear_dx, bilinear_dy = self.problem.A.T.dot(y_half), self.problem.A.dot(x_half)
         Phi_x = self.problem.mu_x*x_half + _df + bilinear_dx
         Phi_y = self.problem.mu_y*y_half + _dg - bilinear_dy
@@ -533,9 +594,13 @@ class FOAM(BaseSaddleOpt):
                                       problem.prox_f_complexity+problem.prox_g_complexity+
                                       problem.grad_f_complexity+problem.grad_g_complexity
                                      )
+        self._prestep_complexity = None
         self._step_complexity = self._zero_step_complexity
         if params is None:
             self.params = self._get_foam_params(problem)
+            
+        self.grad_p_calls = 0
+        self.grad_q_calls = 0
         
         
     @staticmethod
@@ -611,8 +676,10 @@ class FOAM(BaseSaddleOpt):
         
         ):
             self._step_complexity += self._while_step_complexity
-            x_k_half = x_k + self.beta(t)*(x_k_0 - x_k) - _gamma_x*_lambda*(self.a_x(x_k, y_k, z_g) + b_x_k)  
-            y_k_half = y_k + self.beta(t)*(y_k_0 - y_k) - _gamma_y*_lambda*(self.a_y(x_k, y_k, y_g) + b_y_k)  
+            x_k_half = (x_k + self.beta(t)*(x_k_0 - x_k) -
+                        _gamma_x*_lambda*(self.a_x(x_k, y_k, z_g) + b_x_k))  
+            y_k_half = (y_k + self.beta(t)*(y_k_0 - y_k) -
+                        _gamma_y*_lambda*(self.a_y(x_k, y_k, y_g) + b_y_k))  
             x_k_next = self.problem.prox_f(x_k + self.beta(t)*(x_k_0 - x_k) -
                                            _gamma_x*_lambda*self.a_x(x_k_half, y_k_half, z_g),
                                            scale=_gamma_x*_lambda
@@ -622,9 +689,11 @@ class FOAM(BaseSaddleOpt):
                                            scale=_gamma_y*_lambda
                                           )
             b_x_k = (_gamma_x*_lambda)**-1 * (x_k + self.beta(t)*(x_k_0 - x_k) -
-                                              _gamma_x*_lambda*self.a_x(x_k_half, y_k_half, z_g) - x_k_next)
+                                              _gamma_x*_lambda*self.a_x(x_k_half, y_k_half, z_g) -
+                                              x_k_next)
             b_y_k = (_gamma_y*_lambda)**-1 * (y_k + self.beta(t)*(y_k_0 - y_k) -
-                                              _gamma_y*_lambda*self.a_y(x_k_half, y_k_half, y_g) - y_k_next)
+                                              _gamma_y*_lambda*self.a_y(x_k_half, y_k_half, y_g) -
+                                              y_k_next)
             x_k, y_k = x_k_next, y_k_next
             t += 1
         t_k = t    
@@ -633,6 +702,8 @@ class FOAM(BaseSaddleOpt):
         self.y_f = y_k
         
         g_x, g_y = self.problem.grad(self.x_f, self.y_f)
+        self.grad_p_calls += 1
+        self.grad_q_calls += 1
         self.z_f = g_x - self.problem.mu_x*self.x_f + b_x_k
         
         w_f = -g_y - self.problem.mu_y*self.y_f + b_y_k
@@ -648,88 +719,92 @@ class FOAM(BaseSaddleOpt):
         self.y = self.proj_y(self.y)
         
 
-class AccEG(BaseSaddleOpt):
-    def __init__(self,
-                 problem: BaseSaddle,
-                 inner_optimiser: BaseSaddleOpt,
-                 inner_max_iter: int,
-                 x0: np.ndarray, 
-                 y0: np.ndarray,
-                 eps: float,
-                 stopping_criteria: Optional[str],
-                 params: dict
-                ):
-        super().__init__(problem, x0, y0, eps, stopping_criteria, params)
+# class AccEG(BaseSaddleOpt):
+#     def __init__(self,
+#                  problem: BaseSaddle,
+#                  inner_optimiser: BaseSaddleOpt,
+#                  inner_max_iter: int,
+#                  x0: np.ndarray, 
+#                  y0: np.ndarray,
+#                  eps: float,
+#                  stopping_criteria: Optional[str],
+#                  params: dict
+#                 ):
+#         super().__init__(problem, x0, y0, eps, stopping_criteria, params)
         
-        if params is None:
-            self.params = self._get_acceg_params(problem)
-        self.x_f = x0.copy()
-        self.inner_opt = inner_optimiser
-        self.inner_max_iter = inner_max_iter
+#         if params is None:
+#             self.params = self._get_acceg_params(problem)
+#         self.x_f = x0.copy()
+#         self.inner_opt = inner_optimiser
+#         self.inner_max_iter = inner_max_iter
         
  
-    @staticmethod
-    def _get_acceg_params(problem: BaseSaddle):
-        _mu = min(problem.mu_x, problem.mu_y)
-        L_p = problem.L_x
-        tau = min(1, _mu**.5/(2*L_p**.5))
-        theta = 0.5/L_p
-        eta = min(0.5/_mu, 0.5/(_mu*L_p)**.5)
-        alpha = _mu
-        return {"tau": tau,
-                "theta": theta,
-                "eta": eta,
-                "alpha": alpha
-               }
+#     @staticmethod
+#     def _get_acceg_params(problem: BaseSaddle):
+#         _mu = min(problem.mu_x, problem.mu_y)
+#         L_p = problem.L_x
+#         tau = min(1, _mu**.5/(2*L_p**.5))
+#         theta = 0.5/L_p
+#         eta = min(0.5/_mu, 0.5/(_mu*L_p)**.5)
+#         alpha = _mu
+#         return {"tau": tau,
+#                 "theta": theta,
+#                 "eta": eta,
+#                 "alpha": alpha
+#                }
     
     
-    def step(self):
-        x_g = self.params["tau"]*self.x + (1 - self.params["tau"])*self.x_f
+#     def step(self):
+#         x_g = self.params["tau"]*self.x + (1 - self.params["tau"])*self.x_f
         
-        subproblem = BaseSaddle(A=self.problem.A)
-        # min max f(x) + <y, Ax> - g(y)
+#         subproblem = BaseSaddle(A=self.problem.A)
+#         # min max f(x) + <y, Ax> - g(y)
         
-        grad_p, _ = self.problem.fg_grads(x_g, self.y)
-        subproblem.f = lambda x: 0.5/self.params["theta"]*x@x + (grad_p - 1/self.params["theta"]*x_g)@x
-        subproblem.mu_x = subproblem.L_x = self.params["theta"]**-1
-        subproblem._optimiser_params = self.params
-        subproblem._optimiser_params["right_part"] = 1/self.params["theta"]*x_g + grad_p
-        subproblem.g = self.problem.g
-        subproblem.C = self.problem.C 
-        subproblem.mu_y = self.problem.mu_y
-        subproblem.L_y = self.problem.L_y
-        subproblem.mu_xy = self.problem.mu_xy 
-        subproblem.mu_yx = self.problem.mu_yx 
-        subproblem.L_xy = self.problem.L_xy
-        subproblem.xopt, subproblem.yopt = self.problem.xopt,self.problem.yopt
-        subproblem.primal_func = self.problem.primal_func
-        subproblem.dual_func = lambda y, x: subproblem.F(-self.params["theta"]*(grad_p - 1/self.params["theta"]*x_g + subproblem.A.T@y), y)
-        subproblem.prox_f = lambda v, scale: (v + 1/self.params["theta"]*x_g - grad_p)*self.params["theta"]/(1 + self.params["theta"])
-        subproblem.prox_g = self.problem.prox_g
-        subproblem.grad_f = grad(subproblem.f)
-        subproblem.grad_g = grad(subproblem.g)
+#         grad_p, _ = self.problem.fg_grads(x_g, self.y)
+#         subproblem.f = lambda x: 0.5/self.params["theta"]*x@x + (grad_p - 1/self.params["theta"]*x_g)@x
+#         subproblem.mu_x = subproblem.L_x = self.params["theta"]**-1
+#         subproblem._optimiser_params = self.params
+#         subproblem._optimiser_params["right_part"] = 1/self.params["theta"]*x_g + grad_p
+#         subproblem.g = self.problem.g
+#         subproblem.C = self.problem.C 
+#         subproblem.mu_y = self.problem.mu_y
+#         subproblem.L_y = self.problem.L_y
+#         subproblem.mu_xy = self.problem.mu_xy 
+#         subproblem.mu_yx = self.problem.mu_yx 
+#         subproblem.L_xy = self.problem.L_xy
+#         subproblem.xopt, subproblem.yopt = self.problem.xopt,self.problem.yopt
+#         subproblem.primal_func = self.problem.primal_func
+#         subproblem.dual_func = lambda y, x: subproblem.F(-self.params["theta"]*(
+#             grad_p - 1/self.params["theta"]*x_g + subproblem.A.T@y), y)
+#         subproblem.prox_f = lambda v, scale: (
+#             (v + 1/self.params["theta"]*x_g - grad_p)*
+#             self.params["theta"]/(1 + self.params["theta"])
+#         )
+#         subproblem.prox_g = self.problem.prox_g
+#         subproblem.grad_f = grad(subproblem.f)
+#         subproblem.grad_g = grad(subproblem.g)
         
-        inner_optimiser = self.inner_opt(problem=subproblem, x0=x_g,
-                                         y0=self.y, eps=self.eps,
-                                         stopping_criteria='sliding',
-                                         params=None
-                                        )
+#         inner_optimiser = self.inner_opt(problem=subproblem, x0=x_g,
+#                                          y0=self.y, eps=self.eps,
+#                                          stopping_criteria='sliding',
+#                                          params=None
+#                                         )
         
-        _loss, _, _ = inner_optimiser(max_iter=self.inner_max_iter,
-                                         verbose=0)
+#         _loss, _, _ = inner_optimiser(max_iter=self.inner_max_iter,
+#                                          verbose=0)
 
-        self.x_f = inner_optimiser.x
-        self.y = inner_optimiser.y
+#         self.x_f = inner_optimiser.x
+#         self.y = inner_optimiser.y
         
-        # TODO: take grad without y
-        gx, _ = self.problem.fg_grads(self.x_f, inner_optimiser.y)
-        _A = self.problem.A
-        _C = self.problem.C
-        gx += 3/4*_A.T @ LA.inv(_C) @ _A @ self.x_f
-        self.x = (self.x + 
-                  self.params['eta']*self.params['alpha']*(self.x_f - self.x) - 
-                  self.params['eta']*gx
-                 ) 
+#         # TODO: take grad without y
+#         gx, _ = self.problem.fg_grads(self.x_f, inner_optimiser.y)
+#         _A = self.problem.A
+#         _C = self.problem.C
+#         gx += 3/4*_A.T @ LA.inv(_C) @ _A @ self.x_f
+#         self.x = (self.x + 
+#                   self.params['eta']*self.params['alpha']*(self.x_f - self.x) - 
+#                   self.params['eta']*gx
+#                  ) 
         
         
 class AcceleratedEG(BaseSaddleOpt):
@@ -749,12 +824,15 @@ class AcceleratedEG(BaseSaddleOpt):
         self._zero_step_complexity = (4+4+8+8+2+(3+N)+(3+M)+5+5+(2+M)+(2+N)+3+3+
                                       problem.grad_f_complexity+problem.grad_g_complexity)
         self._step_complexity = self._zero_step_complexity
+        self._prestep_complexity = None
         if params is None:
             self.params = self._get_acceg_params(problem)
         self.x_f = x0.copy()
         self.y_f = y0.copy()
         self.inner_opt = inner_optimiser
         self.inner_max_iter = inner_max_iter
+        self.grad_p_calls = 0
+        self.grad_q_calls = 0
         
  
     @staticmethod
@@ -784,35 +862,62 @@ class AcceleratedEG(BaseSaddleOpt):
         subproblem = BaseSaddle(A=self.problem.A)
         # min max f(x) + <y, Ax> - g(y)
         grad_f, grad_g = self.problem.fg_grads(x_g, y_g)
-        subproblem.f = lambda x: self.problem.f(x_g) + grad_f@(x - x_g) + 1/2/self.params["eta_x"] * (x - self.x).T@(x - self.x) 
-        subproblem.g = lambda y: self.problem.g(y_g) + grad_g@(y - y_g) + 1/2/self.params["eta_y"] * (y - self.y).T@(y - self.y) 
-        subproblem.mu_x = subproblem.L_x = (self.params["eta_x"])**-1
-        subproblem.mu_y = subproblem.L_y = (self.params["eta_y"])**-1
+        self.grad_p_calls += 1 
+        self.grad_q_calls += 1 
+        subproblem.f = lambda x: (self.problem.f(x_g) + grad_f@(x - x_g) +
+                                  1/2/self.params["eta_x"] * (x - self.x).T@(x - self.x) +
+                                  0.5*self.problem.mu_x*x.T@x - self.problem.mu_x*x_g.T@x)
+        subproblem.g = lambda y: (self.problem.g(y_g) + grad_g@(y - y_g) +
+                                  1/2/self.params["eta_y"] * (y - self.y).T@(y - self.y) +
+                                  0.5*self.problem.mu_y*y.T@y - self.problem.mu_y*y_g.T@y)
+        subproblem.mu_x = subproblem.L_x = (self.params["eta_x"])**-1 + self.problem.mu_x
+        subproblem.mu_y = subproblem.L_y = (self.params["eta_y"])**-1 + self.problem.mu_y
         subproblem._optimiser_params = self.params
         subproblem.mu_xy = self.problem.mu_xy 
         subproblem.mu_yx = self.problem.mu_yx 
         subproblem.L_xy = self.problem.L_xy
     
-        u_opt = LA.solve(np.block([[np.eye(self.x.shape[0]), self.params["eta_x"]*subproblem.A.T],
-                                  [-self.params["eta_y"]*subproblem.A, np.eye(self.y.shape[0])]]), 
-                         np.hstack([self.x - self.params["eta_x"]*grad_f,
-                                    self.y - self.params["eta_y"]*grad_g
+        u_opt = LA.solve(np.block([[(1/self.params["eta_x"] + self.problem.mu_x)*np.eye(self.x.shape[0]), subproblem.A.T],
+                                  [subproblem.A, -(1/self.params["eta_y"] + self.problem.mu_y)*np.eye(self.y.shape[0])]]), 
+                         np.hstack([1/self.params["eta_x"] * self.x - grad_f + self.problem.mu_x*x_g,
+                                    -1/self.params["eta_y"] * self.y + grad_g - self.problem.mu_y*y_g
                                    ])
                         )
         subproblem.xopt, subproblem.yopt = u_opt[: self.x.shape[0]], u_opt[self.x.shape[0]: ]
-        subproblem.primal_func = lambda x, y: subproblem.F(self.x, self.y - self.params["eta_y"]*(grad_g - subproblem.A@x))
-        subproblem.dual_func = lambda y, x: subproblem.F(self.x - self.params["eta_x"]*(grad_f + subproblem.A.T@y), y)
-        subproblem.prox_f = lambda v, scale: (self.x - self.params["eta_x"]*(grad_f - v))/(1 + self.params["eta_x"])
-        subproblem.prox_g = lambda v, scale: (self.y - self.params["eta_y"]*(grad_g - v))/(1 + self.params["eta_y"])
+        subproblem.primal_func = lambda x, y: subproblem.F(x, 
+                                                           (subproblem.A@x + 
+                                                           1/self.params["eta_y"] * self.y -
+                                                           grad_g + self.problem.mu_y*y_g) / 
+                                                           (1/self.params["eta_y"] + self.problem.mu_y)
+                                                          )
+        subproblem.dual_func = lambda y, x: subproblem.F((-subproblem.A.T@y + 
+                                                          1/self.params["eta_x"] * self.x -
+                                                          grad_f + self.problem.mu_x*x_g) / 
+                                                         (1/self.params["eta_x"] + self.problem.mu_x),
+                                                         y
+                                                        )
+        
+        subproblem.prox_f = lambda v, scale: (1 + 
+                                              1/(self.problem.mu_x + 
+                                                 1/self.params["eta_x"])
+                                             ) * (self.problem.mu_x*x_g +
+                                                  1/self.params["eta_x"]*self.x -
+                                                  grad_f) + v
+        subproblem.prox_g = lambda v, scale: (1 + 
+                                              1/(self.problem.mu_y + 
+                                                 1/self.params["eta_y"])
+                                             ) * (self.problem.mu_y*y_g +
+                                                  1/self.params["eta_y"]*self.y -
+                                                  grad_g) + v
         subproblem.grad_f = grad(subproblem.f)
         subproblem.grad_g = grad(subproblem.g)
         N, M = self.problem.A.shape
-        subproblem.gradx_complexity = 1+1+2+M
-        subproblem.grady_complexity = 1+1+2+N
-        subproblem.grad_f_complexity = 1+1+2
-        subproblem.grad_g_complexity = 1+1+2
-        subproblem.prox_f_complexity = 1+1+1+1+1
-        subproblem.prox_g_complexity = 1+1+1+1+1
+        subproblem.gradx_complexity = 1+1+1+1+2+M
+        subproblem.grady_complexity = 1+1+1+1+2+N
+        subproblem.grad_f_complexity = 1+1+1+1+2
+        subproblem.grad_g_complexity = 1+1+1+1+2
+        subproblem.prox_f_complexity = 1+1+1+1+1+1+1+1+1+1+1
+        subproblem.prox_g_complexity = 1+1+1+1+1+1+1+1+1+1+1
         
         inner_optimiser = self.inner_opt(problem=subproblem, x0=self.x,
                                          y0=self.y, eps=self.eps,
@@ -832,3 +937,303 @@ class AcceleratedEG(BaseSaddleOpt):
         
         self.x = _x_next
         self.y = _y_next
+        
+        
+# class AcceleratedEG(BaseSaddleOpt):
+#     def __init__(self,
+#                  problem: BaseSaddle,
+#                  inner_max_iter: int,
+#                  x0: np.ndarray, 
+#                  y0: np.ndarray,
+#                  eps: float,
+#                  stopping_criteria: Optional[str],
+#                  params: dict
+#                 ):
+#         super().__init__(problem, x0, y0, eps, stopping_criteria, params)
+        
+#         N,M = problem.A.shape
+#         self._zero_step_complexity = (4+4+
+#                                       problem.grad_f_complexity+problem.grad_g_complexity+
+#                                       6+11+N+ # _b
+#                                       (3+N)+
+#                                       (3+M)+
+#                                       3+3
+#                                       )
+#         self._prestep_complexity = 1+2+1+2+1+1+N
+#         # 1+2+1+2+1+1+N + # One time _A computation
+#         self._step_complexity = (
+#             self._zero_step_complexity
+#         )
+#         self.grad_p_calls = 0
+#         self.grad_q_calls = 0
+#         if params is None:
+#             self.params = self._get_acceg_params(problem)
+#         self.x_f = x0.copy()
+#         self.y_f = y0.copy()
+#         self.inner_max_iter = inner_max_iter
+#         self._A = 0.5 * ((1/self.params["eta_x"] + self.problem.mu_x) *
+#                          (1/self.params["eta_y"] + self.problem.mu_y) *
+#                          np.eye(self.x.shape[0]) + 
+#                          self.problem.A.T@self.problem.A
+#                         )
+        
+ 
+#     @staticmethod
+#     def _get_acceg_params(problem: BaseSaddle):
+#         _mu = min(problem.mu_x, problem.mu_y)
+#         # L_p = max(problem.L_x, problem.L_y)
+#         if problem.L_x/problem.mu_x > problem.L_y/problem.mu_y:
+#             alpha = min(1, (problem.mu_x / problem.L_x)**.5)
+#             eta_x = min((3*problem.mu_x)**-1, (3*alpha*problem.L_x)**-1)
+#             eta_y = problem.mu_x/problem.mu_y * eta_x
+#         else:
+#             alpha = min(1, (problem.mu_y / problem.L_y)**.5)
+#             eta_y = min((3*problem.mu_y)**-1, (3*alpha*problem.L_y)**-1)
+#             eta_x = problem.mu_y/problem.mu_x * eta_y
+
+#         return {"eta_x": eta_x,
+#                 "eta_y": eta_y,
+#                 "alpha": alpha
+#                }
+    
+    
+#     def step(self):
+#         # TODO: 
+#         # A^T A complexity - one time computation DONE
+#         # A^T A or A A^T (depends on the d_x, d_y)
+#         self._step_complexity = self._zero_step_complexity
+#         x_g = self.params["alpha"]*self.x + (1 - self.params["alpha"])*self.x_f
+#         y_g = self.params["alpha"]*self.y + (1 - self.params["alpha"])*self.y_f
+        
+#         subproblem = BaseSaddle(A=np.zeros_like(self.problem.A))
+#         # min max f(x) + <y, Ax> - g(y)
+#         grad_f, grad_g = self.problem.fg_grads(x_g, y_g)
+        
+#         _b = (grad_f - self.problem.mu_x*x_g -
+#               1/self.params["eta_x"] * self.x + 
+#               (1 - 2*self.params["eta_y"]/(1 + self.params["eta_y"]*self.problem.mu_y)) * 
+#               self.problem.A.T@(grad_g - self.problem.mu_y*y_g - 1/self.params["eta_y"]*self.y)
+#              )
+#         # _c = (self.params["eta_y"]/2/(1 + self.params["eta_y"]*self.problem.mu_y) *
+#         #       ((grad_g - self.problem.mu_y*y_g).T@(grad_g - self.problem.mu_y*y_g)) - 
+#         #       1/(1 + self.params["eta_y"]*self.problem.mu_y)*(grad_g - self.problem.mu_y*y_g)@self.y +
+#         #       (self.problem.mu_y*(1 - self.params["eta_y"]*self.problem.mu_y))/2 / 
+#         #       (1 + self.params["eta_y"]*self.problem.mu_y)**2 * self.y.T@self.y
+#         #      )
+#         # subproblem.f = lambda x: x.T@self._A@x + _b.T@x + _c
+#         subproblem.f = lambda x: x.T@self._A@x + _b.T@x 
+#         subproblem.g = lambda y: 0
+#         eigvalsx = LA.eigvalsh(self._A)
+#         subproblem.mu_x = eigvalsx[0]
+#         subproblem.L_x = eigvalsx[-1]
+#         subproblem.mu_y = subproblem.L_y = 0
+#         subproblem._optimiser_params = self.params
+#         subproblem.mu_xy = 0
+#         subproblem.mu_yx = 0
+#         subproblem.L_xy = 0
+
+#         subproblem.xopt, subproblem.yopt = LA.solve(self._A, _b), np.zeros_like(self.y)
+#         subproblem.primal_func = None
+#         subproblem.dual_func = None
+        
+#         subproblem.prox_f = None
+#         subproblem.prox_g = None
+#         subproblem.grad_f = grad(subproblem.f)
+#         subproblem.grad_g = np.zeros_like(self.y)
+#         N, M = self.problem.A.shape
+#         subproblem.gradx_complexity = N + 1
+#         subproblem.grady_complexity = 0
+#         subproblem.grad_f_complexity = N + 1
+#         subproblem.grad_g_complexity = 0
+#         subproblem.prox_f_complexity = 0
+#         subproblem.prox_g_complexity = 0
+        
+#         inner_optimiser = NesterovAGD(subproblem,
+#                                       x0=self.x, 
+#                                       y0=self.y,
+#                                       eps=self.eps,
+#                                       stopping_criteria='accel_sliding',
+#                                       params=None
+#                                      )       
+        
+#         _loss, _, _ = inner_optimiser(max_iter=self.inner_max_iter,
+#                                       verbose=0)
+
+#         _y_x = 1/(1/self.params["eta_y"] + self.problem.mu_y) * (
+#             self.problem.A.dot(inner_optimiser.x) - 
+#             grad_g + self.problem.mu_y*y_g +
+#             1/self.params["eta_y"]*self.y
+#         )
+#         self._step_complexity += sum(inner_optimiser.all_metrics["step_complexity"])
+#         self.grad_p_calls += 1
+#         self.grad_q_calls += 1
+#         _x_next = self.x - self.params['eta_x']*(grad_f + self.problem.A.T@_y_x)
+#         ### +++ -> ---
+#         _y_next = self.y - self.params['eta_y']*(grad_g - self.problem.A@inner_optimiser.x)
+        
+#         self.x_f = x_g + self.params["alpha"]*(inner_optimiser.x - self.x)
+#         self.y_f = y_g + self.params["alpha"]*(_y_x - self.y)
+        
+#         self.x = _x_next
+#         self.y = _y_next
+
+class TwiceAcceleratedEG(BaseSaddleOpt):
+    def __init__(self,
+                 problem: BaseSaddle,
+                 x0: np.ndarray,
+                 y0: np.ndarray,
+                 eps: float,
+                 stopping_criteria: Optional[str],
+                 params: dict
+                 ):
+        super().__init__(problem, x0, y0, eps, stopping_criteria, params)
+
+        N, M = problem.A.shape
+        self._zero_step_complexity = 0 # (4 + 4 + 8 + 8 + 2 + (3 + N) + (3 + M) + 5 + 5 + (2 + M) + (2 + N) + 3 + 3 +
+                                     # problem.grad_f_complexity + problem.grad_g_complexity)
+        self._step_complexity = self._zero_step_complexity
+        self._prestep_complexity = None
+        if params is None:
+            self.params = self._get_twice_acceg_params(problem)
+        self.x_f = x0.copy()
+        self.y_f = y0.copy()
+        self.grad_p_calls = 0
+        self.grad_q_calls = 0
+
+    @staticmethod
+    def _get_twice_acceg_params(problem: BaseSaddle):
+        _mu = min(problem.mu_x, problem.mu_y)
+        # L_p = max(problem.L_x, problem.L_y)
+        if problem.L_x / problem.mu_x > problem.L_y / problem.mu_y:
+            theta = min(1, (problem.mu_x / problem.L_x) ** .5)
+            eta_x = min((3 * problem.mu_x) ** -1, (3 * theta * problem.L_x) ** -1)
+            eta_y = problem.mu_x / problem.mu_y * eta_x
+        else:
+            theta = min(1, (problem.mu_y / problem.L_y) ** .5)
+            eta_y = min((3 * problem.mu_y) ** -1, (3 * theta * problem.L_y) ** -1)
+            eta_x = problem.mu_y / problem.mu_x * eta_y
+
+        beta_x = min(1 / (2 * problem.L_y), 1 / (1 * eta_x * problem.L_xy ** 2))
+        beta_y = min(1 / (2 * problem.L_x), 1 / (1 * eta_y * problem.L_xy ** 2))
+        return {"eta_x": eta_x,
+                "eta_y": eta_y,
+                "beta_x": beta_x,
+                "beta_y": beta_y,
+                "gamma_x": lambda t: eta_x,
+                "gamma_y": lambda t: eta_y,
+                "alpha": lambda t: t / (t+3),
+                "theta": theta
+                }
+
+    def step(self):
+        self._step_complexity = self._zero_step_complexity
+        x_g = self.params["theta"] * self.x + (1 - self.params["theta"]) * self.x_f
+        y_g = self.params["theta"] * self.y + (1 - self.params["theta"]) * self.y_f
+
+        t = 0
+
+        grad_f, grad_g = self.problem.fg_grads(x_g, y_g)
+        p_x = lambda x: (anp.sum((x - self.x)**2) / 2 / self.params["eta_x"] +
+                         (grad_f - self.params["beta_x"] * self.problem.A.T @ grad_g).T @ self.x +
+                         self.params["beta_x"] / 2 * anp.sum((self.problem.A @ self.x)**2)
+                         )
+        q_y = lambda y: (anp.sum((y - self.y) ** 2) / 2 / self.params["eta_y"] +
+                         (grad_g + self.params["beta_y"] * self.problem.A @ grad_f).T @ self.y +
+                         self.params["beta_y"] / 2 * anp.sum((self.problem.A.T @ self.y) ** 2)
+                         )
+        grad_p = grad(p_x)
+        grad_q = grad(q_y)
+        x_ag = x_g.copy()
+        x_r = x_g.copy()
+        y_ag = y_g.copy()
+        y_r = y_g.copy()
+
+        Fx, Fy = self.problem.grad(x_ag, y_ag)
+        while (
+                (self.params["eta_x"] * LA.norm(Fx) ** 2 +
+                 self.params["eta_y"] * LA.norm(Fy) ** 2) >
+                1 / 6 * (1 / self.params["eta_x"] * LA.norm(x_ag - x_g) ** 2 +
+                         1 / self.params["eta_y"] * LA.norm(y_ag - y_g) ** 2)
+        ):
+            # self._step_complexity += self._while_step_complexity
+            x_md_kp1 = (1 - self.params["alpha"](t)) * x_ag + self.params["alpha"](t) * x_r
+            y_md_kp1 = (1 - self.params["alpha"](t)) * y_ag + self.params["alpha"](t) * y_r
+
+            x_w_tp1 = x_r - self.params["gamma_x"](t) * (self.problem.A.T @ y_r + grad_p(x_md_kp1))
+            y_w_tp1 = y_r - self.params["gamma_y"](t) * (-self.problem.A @ x_r + grad_q(y_md_kp1))
+
+            x_r = x_r - self.params["gamma_x"](t) * (self.problem.A.T @ y_w_tp1 + grad_p(x_md_kp1))
+            y_r = y_r - self.params["gamma_y"](t) * (-self.problem.A @ x_w_tp1 + grad_q(y_md_kp1))
+
+            x_ag = (1 - self.params["alpha"](t)) * x_ag + self.params["alpha"](t) * x_w_tp1
+            y_ag = (1 - self.params["alpha"](t)) * y_ag + self.params["alpha"](t) * y_w_tp1
+            Fx, Fy = self.problem.grad(x_ag, y_ag)
+            print((self.params["eta_x"] * LA.norm(Fx) ** 2 +
+                   self.params["eta_y"] * LA.norm(Fy) ** 2))
+            print(1 / 6 * (1 / self.params["eta_x"] * LA.norm(x_ag - x_g) ** 2 +
+                         1 / self.params["eta_y"] * LA.norm(y_ag - y_g) ** 2))
+            t += 1
+
+        # self._step_complexity += sum(inner_optimiser.all_metrics["step_complexity"])
+        _x_next = (self.x - self.params['eta_x'] * (grad_f + self.problem.A.T @ y_ag) -
+                   self.params['beta_x'] * self.params['eta_x'] * self.problem.A.T @ (-grad_g + self.problem.A @ x_ag))
+        _y_next = (self.y - self.params['eta_y'] * (grad_g - self.problem.A @ x_ag) -
+                   self.params['beta_y'] * self.params['eta_y'] * self.problem.A @ (grad_f + self.problem.A.T @ y_ag))
+
+        self.x_f = x_g + self.params["theta"] * (x_ag - self.x)
+        self.y_f = y_g + self.params["theta"] * (y_ag - self.y)
+
+        self.x = _x_next
+        self.y = _y_next
+
+
+class NesterovAGD(BaseSaddleOpt):
+    def __init__(self,
+                 problem: BaseSaddle,
+                 x0: np.ndarray, 
+                 y0: np.ndarray,
+                 eps: float,
+                 stopping_criteria: Optional[str],
+                 params: dict
+                ):
+        super().__init__(problem, x0, y0, eps, stopping_criteria, params)
+        
+        N,M = problem.A.shape
+        self._zero_step_complexity = (1+1+1+1+2+1+
+                                      problem.grad_f_complexity+1+1+1+1+1+
+                                      1+1
+                                     )
+        self._prestep_complexity = None
+        if self.params is None:
+            self.params = {"eta" : 1/2/problem.L_x}
+        self._step_complexity = self._zero_step_complexity
+        self.grad_p_calls = 0
+        self.grad_q_calls = 0
+        
+        self.x_f = x0.copy()
+        self.y_f = y0.copy()
+        self._t = 1
+        self._lambda_prev = 0
+        self._lambda_curr = 1
+    
+    def step(self):
+        
+        x_next = self.x_f - self.params["eta"] * self.problem.grad_f(self.x_f)
+        self.grad_p_calls += 1
+        # x_f_next = x_next + (self._t - 1.0)/(t_next) * (x_next - self.x)
+        x_f_next = (1 - self._t)*x_next + self._t*self.x
+        
+        _tmp = self._lambda_curr
+        self._lambda_curr = .5 * (1 + np.sqrt(1 + 4*self._lambda_prev**2))
+        self._lambda_prev = _tmp
+        
+        self._t = (1 - self._lambda_prev) / self._lambda_curr
+        # restarting strategies
+        if np.dot(self.x_f - x_next, x_next - self.x) > 0:
+            x_f_next = x_next
+            self._t = 1
+            # if k %% k_restart == 0:
+        
+        self.x = x_next
+        self.x_f = x_f_next
+        
